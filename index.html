@@ -1,0 +1,80 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montran Map Showcase</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap');
+        
+        :root {
+            font-size: 16px;
+        }
+
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+            font-weight: 300; /* Source Sans 3 Light */
+            overflow: hidden;
+            background-color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Updated Typescale: +15% larger than previous version */
+        .text-display-1 { font-size: 190px; line-height: 1.1; font-weight: 300; }
+        .text-display-2 { font-size: 142px; line-height: 1.1; font-weight: 300; }
+        .text-display-3 { font-size: 114px; line-height: 1.1; font-weight: 300; }
+        .text-display-4 { font-size: 92px; line-height: 1.1; font-weight: 300; }
+        .text-display-5 { font-size: 78px; line-height: 1.1; font-weight: 300; }
+        .text-display-6 { font-size: 63px; line-height: 1.1; font-weight: 300; }
+        .text-display-7 { font-size: 52px; line-height: 1.1; font-weight: 300; }
+        .text-display-8 { font-size: 32px; line-height: 1.2; font-weight: 300; }
+        .text-display-9 { font-size: 21px; line-height: 1.4; font-weight: 300; }
+
+        button, input, select, a {
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 300;
+        }
+
+        .map-container {
+            cursor: grab;
+            background: #ffffff;
+        }
+
+        .map-container:active {
+            cursor: grabbing;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .grid-dot {
+            transition: fill 0.3s ease, opacity 0.3s ease;
+        }
+
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "d3": "https://esm.sh/d3@^7.9.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+</head>
+<body class="text-slate-900">
+    <div id="root"></div>
+</body>
+</html>

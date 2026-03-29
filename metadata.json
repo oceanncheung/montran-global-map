@@ -1,0 +1,5 @@
+{
+  "name": "Montran Global Map",
+  "description": "A world map visualization tool for Montran to showcase offices, global presence, and product deployments using a custom dotted map background.",
+  "requestFramePermissions": []
+}
