@@ -3,68 +3,82 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { geoToPixel } from '../utils/geo';
 import { OfficeLocation } from '../types';
-import { MAP_DOTS } from '../constants';
-import { computeMappings, MANUAL_MAPPINGS, CountryDotMap } from '../utils/mappings';
+import { MAP_DOTS, MONTRAN_OFFICES } from '../constants';
+import { MANUAL_MAPPINGS } from '../utils/mappings';
 
 interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
-  geoData: any;
 }
 
 const DEFAULT_ZOOM = 0.8;
 
 const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
-  selectedCountries,
-  geoData
+  selectedCountries
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const currentTransformRef = useRef<d3.ZoomTransform | null>(null);
+  const defaultTransformRef = useRef<d3.ZoomTransform | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(DEFAULT_ZOOM);
-  
-  // Initialize with manual mappings so they work immediately
-  const [mappings, setMappings] = useState<CountryDotMap>(MANUAL_MAPPINGS);
-
-  // Compute full mappings when GeoJSON loads
-  useEffect(() => {
-    if (geoData) {
-      computeMappings(geoData).then(result => {
-        setMappings(result);
-      });
-    }
-  }, [geoData]);
 
   // Derived set of indices to highlight based on sidebar selection
   const activeDotIndices = useMemo(() => {
     const indices = new Set<number>();
     selectedCountries.forEach(countryName => {
-      const countryDots = mappings[countryName];
+      const countryDots = MANUAL_MAPPINGS[countryName];
       if (countryDots) {
         countryDots.forEach(idx => indices.add(idx));
       }
     });
     return indices;
-  }, [selectedCountries, mappings]);
+  }, [selectedCountries]);
 
-  const snappedOffices = useMemo(() => {
-    return selectedOffices.map(office => {
-      const target = geoToPixel(office.lat, office.lng);
-      let minDist = Infinity;
-      let closestDot = MAP_DOTS[0] || { x: 0, y: 0 };
-      
-      MAP_DOTS.forEach(dot => {
-        const d = (dot.x - target.x)**2 + (dot.y - target.y)**2;
-        if (d < minDist) {
-          minDist = d;
-          closestDot = dot;
-        }
-      });
-      return { ...office, snappedX: closestDot.x, snappedY: closestDot.y };
+  const snappedOfficeMarkers = useMemo(() => {
+    const dotsWithIndices = MAP_DOTS.map((dot, index) => ({ ...dot, index }));
+    const selectedCountries = Array.from(new Set(selectedOffices.map((office) => office.country)));
+
+    return selectedCountries.map((country) => {
+      const anchorOffice =
+        MONTRAN_OFFICES.find((office) => office.country === country && office.markerAnchor) ??
+        MONTRAN_OFFICES.find((office) => office.country === country) ??
+        selectedOffices.find((office) => office.country === country);
+
+      const target = geoToPixel(anchorOffice?.lat ?? 0, anchorOffice?.lng ?? 0);
+      const countryDotIndices = MANUAL_MAPPINGS[country];
+      const candidateDots = countryDotIndices?.length
+        ? countryDotIndices
+            .map((index) => ({ index, ...MAP_DOTS[index] }))
+            .filter((dot) => Number.isFinite(dot.x) && Number.isFinite(dot.y))
+        : dotsWithIndices;
+
+      const chosenDot = candidateDots
+        .map((dot) => ({
+          ...dot,
+          distance: Math.hypot(dot.x - target.x, dot.y - target.y),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
+
+      return {
+        id: country,
+        snappedX: chosenDot?.x ?? 0,
+        snappedY: chosenDot?.y ?? 0,
+      };
     });
   }, [selectedOffices]);
+
+  const transformsMatch = (a: d3.ZoomTransform | null, b: d3.ZoomTransform | null) => {
+    if (!a || !b) return false;
+
+    return (
+      Math.abs(a.x - b.x) < 0.01 &&
+      Math.abs(a.y - b.y) < 0.01 &&
+      Math.abs(a.k - b.k) < 0.001
+    );
+  };
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -75,6 +89,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       .scaleExtent([0.4, 15])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
+        currentTransformRef.current = event.transform;
         setZoomScale(event.transform.k);
       });
 
@@ -88,8 +103,16 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       
       const tx = (width - 2600 * initialScale) / 2;
       const ty = (height - 1450 * initialScale) / 2;
-      
-      svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+      const nextDefaultTransform = d3.zoomIdentity.translate(tx, ty).scale(initialScale);
+      const shouldRecenter =
+        !currentTransformRef.current ||
+        transformsMatch(currentTransformRef.current, defaultTransformRef.current);
+
+      defaultTransformRef.current = nextDefaultTransform;
+
+      if (shouldRecenter) {
+        svg.call(zoom.transform, nextDefaultTransform);
+      }
     };
 
     updateCentering();
@@ -115,12 +138,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       const targetScale = DEFAULT_ZOOM;
       const tx = (width - 2600 * targetScale) / 2;
       const ty = (height - 1450 * targetScale) / 2;
+      const resetTransform = d3.zoomIdentity.translate(tx, ty).scale(targetScale);
+
+      defaultTransformRef.current = resetTransform;
 
       d3.select(svgRef.current)
         .transition()
         .duration(750)
         .ease(d3.easeCubicOut)
-        .call(zoomRef.current.transform, d3.zoomIdentity.translate(tx, ty).scale(targetScale));
+        .call(zoomRef.current.transform, resetTransform);
     }
   };
 
@@ -269,7 +295,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
             })}
           </g>
           <g id="offices">
-            {snappedOffices.map((office) => (
+            {snappedOfficeMarkers.map((office) => (
               <circle
                 key={office.id}
                 cx={office.snappedX}

@@ -1,28 +1,16 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import MapCanvas from './components/MapCanvas';
 import { SidebarTab } from './types';
 import { MONTRAN_OFFICES } from './constants';
+import { COUNTRY_NAMES } from './utils/mappings';
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.OFFICES);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
-  const [allCountryNames, setAllCountryNames] = useState<string[]>([]);
-  const [geoData, setGeoData] = useState<any>(null);
-
-  useEffect(() => {
-    fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
-      .then(res => res.json())
-      .then(data => {
-        setGeoData(data);
-        const names = data.features.map((f: any) => f.properties.ADMIN || f.properties.name || f.properties.NAME);
-        setAllCountryNames(Array.from(new Set<string>(names)).sort());
-      })
-      .catch(err => console.error("Error loading geojson:", err));
-  }, []);
 
   const toggleOffice = (id: string) => {
     setSelectedOffices(prev => 
@@ -65,14 +53,13 @@ const App: React.FC = () => {
         selectedCountries={selectedCountries}
         addCountry={addCountry}
         removeCountry={removeCountry}
-        allCountryNames={allCountryNames}
+        allCountryNames={COUNTRY_NAMES}
       />
       
       <main className="flex-1 relative overflow-hidden flex flex-col">
         <MapCanvas 
           selectedOffices={currentOfficeObjects}
           selectedCountries={selectedCountries}
-          geoData={geoData}
         />
       </main>
     </div>

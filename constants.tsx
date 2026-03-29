@@ -6,21 +6,21 @@ export interface MontranOffice extends OfficeLocation {
 }
 
 export const MONTRAN_OFFICES: MontranOffice[] = [
-  { id: 'ny-hq', name: 'Montran Corporation', city: 'New York City', address: '', region: 'Corporate HQ', lat: 40.7517, lng: -73.9795 },
-  { id: 'nj-branch', name: 'Montran New Jersey', city: 'Princeton', address: '', region: 'Americas', lat: 40.3415, lng: -74.6144 },
-  { id: 'ct-branch', name: 'Montran Connecticut', city: 'Norwalk', address: '', region: 'Americas', lat: 41.1468, lng: -73.4948 },
-  { id: 'latam-branch', name: 'Montran LATAM', city: 'Quito', address: '', region: 'Americas', lat: -0.2045, lng: -78.4855 },
-  { id: 'uk-branch', name: 'Montran UK', city: 'London', address: '', region: 'Europe', lat: 51.5189, lng: -0.1558 },
-  { id: 'eu-branch', name: 'Montran Europe', city: 'Cluj-Napoca', address: '', region: 'Europe', lat: 46.7712, lng: 23.6236 },
-  { id: 'mena-branch', name: 'Montran MENA', city: 'Dubai', address: '', region: 'MENA', lat: 25.1098, lng: 55.1764 },
-  { id: 'africa-branch', name: 'Montran Africa', city: 'Nairobi', address: '', region: 'Africa', lat: -1.2618, lng: 36.8016 },
-  { id: 'india-reg', name: 'Montran India', city: 'Mumbai', address: '', region: 'APAC', lat: 19.1627, lng: 72.8550 },
-  { id: 'india-bhopal', name: 'Montran India', city: 'Bhopal', address: '', region: 'APAC', lat: 23.2081, lng: 77.4475 },
-  { id: 'india-chennai', name: 'Montran India', city: 'Chennai', address: '', region: 'APAC', lat: 12.9666, lng: 80.1415 },
-  { id: 'india-navi', name: 'Montran India', city: 'Navi Mumbai', address: '', region: 'APAC', lat: 19.1246, lng: 73.0112 },
-  { id: 'india-pune-amar', name: 'Montran India', city: 'Pune', address: '', region: 'APAC', lat: 18.5594, lng: 73.7915 },
-  { id: 'india-services', name: 'Montran Services', city: 'Pune', address: '', region: 'APAC', lat: 18.5580, lng: 73.7925 },
-  { id: 'singapore', name: 'Montran Singapore', city: 'Singapore', address: '', region: 'APAC', lat: 1.3005, lng: 103.8580 },
+  { id: 'ny-hq', name: 'Montran Corporation', city: 'New York City', address: '', region: 'Corporate HQ', country: 'United States of America', markerAnchor: true, lat: 40.7517, lng: -73.9795 },
+  { id: 'nj-branch', name: 'Montran New Jersey', city: 'Princeton', address: '', region: 'Americas', country: 'United States of America', lat: 40.3415, lng: -74.6144 },
+  { id: 'ct-branch', name: 'Montran Connecticut', city: 'Norwalk', address: '', region: 'Americas', country: 'United States of America', lat: 41.1468, lng: -73.4948 },
+  { id: 'latam-branch', name: 'Montran LATAM', city: 'Quito', address: '', region: 'Americas', country: 'Ecuador', lat: -0.2045, lng: -78.4855 },
+  { id: 'uk-branch', name: 'Montran UK', city: 'London', address: '', region: 'Europe', country: 'United Kingdom', lat: 51.5189, lng: -0.1558 },
+  { id: 'eu-branch', name: 'Montran Europe', city: 'Cluj-Napoca', address: '', region: 'Europe', country: 'Romania', lat: 46.7712, lng: 23.6236 },
+  { id: 'mena-branch', name: 'Montran MENA', city: 'Dubai', address: '', region: 'MENA', country: 'United Arab Emirates', lat: 25.1098, lng: 55.1764 },
+  { id: 'africa-branch', name: 'Montran Africa', city: 'Nairobi', address: '', region: 'Africa', country: 'Kenya', lat: -1.2618, lng: 36.8016 },
+  { id: 'india-reg', name: 'Montran India', city: 'Mumbai', address: '', region: 'APAC', country: 'India', markerAnchor: true, lat: 19.1627, lng: 72.8550 },
+  { id: 'india-bhopal', name: 'Montran India', city: 'Bhopal', address: '', region: 'APAC', country: 'India', lat: 23.2081, lng: 77.4475 },
+  { id: 'india-chennai', name: 'Montran India', city: 'Chennai', address: '', region: 'APAC', country: 'India', lat: 12.9666, lng: 80.1415 },
+  { id: 'india-navi', name: 'Montran India', city: 'Navi Mumbai', address: '', region: 'APAC', country: 'India', lat: 19.1246, lng: 73.0112 },
+  { id: 'india-pune-amar', name: 'Montran India', city: 'Pune', address: '', region: 'APAC', country: 'India', lat: 18.5594, lng: 73.7915 },
+  { id: 'india-services', name: 'Montran Services', city: 'Pune', address: '', region: 'APAC', country: 'India', lat: 18.5580, lng: 73.7925 },
+  { id: 'singapore', name: 'Montran Singapore', city: 'Singapore', address: '', region: 'APAC', country: 'Singapore', lat: 1.3005, lng: 103.8580 },
 ];
 
 export const MAP_DOTS: MapPoint[] = [

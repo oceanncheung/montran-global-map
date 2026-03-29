@@ -9,6 +9,8 @@ export interface OfficeLocation {
   name: string;
   address: string;
   region: string;
+  country: string;
+  markerAnchor?: boolean;
   lat: number;
   lng: number;
 }
