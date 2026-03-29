@@ -41,14 +41,17 @@ const VISUAL_REGION_RULES = [
   {
     name: 'Korean Peninsula',
     countries: {
-      // On this dotted artwork, the peninsula reads as a connected mainland
-      // chain. Using a connected shared chain feels more correct than letting
-      // South Korea jump over to the nearby Japan cluster.
+      // Keep Korea intentionally tiny on this artwork: use the 3-dot chain
+      // just to the left of Japan so the peninsula sits lower and reads
+      // closer to the real-world relationship between China, Korea, and Japan.
+      China: {
+        remove: [1486, 1528],
+      },
       'North Korea': {
-        replace: [1411, 1428, 1486, 1528],
+        replace: [1428, 1486],
       },
       'South Korea': {
-        replace: [1486, 1528, 1596, 1658],
+        replace: [1486, 1528],
       },
     },
   },
@@ -580,8 +583,11 @@ const generateCountryData = async () => {
 
       const baseDots = rule.replace?.length ? rule.replace : (mapping[countryName] ?? []);
       const addDots = rule.add ?? [];
+      const removeDots = new Set(rule.remove ?? []);
 
-      mapping[countryName] = Array.from(new Set([...baseDots, ...addDots])).sort((a, b) => a - b);
+      mapping[countryName] = Array.from(
+        new Set([...baseDots, ...addDots].filter((dotIndex) => !removeDots.has(dotIndex))),
+      ).sort((a, b) => a - b);
     }
   }
 

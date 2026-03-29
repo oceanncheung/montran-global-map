@@ -1833,7 +1833,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1483,
     1484,
     1485,
-    1486,
     1496,
     1497,
     1498,
@@ -1843,7 +1842,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1509,
     1517,
     1518,
-    1528,
     1535,
     1536,
     1537,
@@ -2125,10 +2123,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1583
   ],
   "North Korea": [
-    1411,
     1428,
-    1486,
-    1528
+    1486
   ],
   "Azerbaijan": [
     1433,
@@ -3366,9 +3362,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   ],
   "South Korea": [
     1486,
-    1528,
-    1596,
-    1658
+    1528
   ],
   "Costa Rica": [
     2142
