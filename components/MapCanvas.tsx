@@ -10,6 +10,8 @@ interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
   isSidebarOpen: boolean;
+  isGlobalGreen: boolean;
+  onToggleGlobalGreen: (on: boolean) => void;
 }
 
 const MAP_CONTENT_CENTER_X = (83 + 2668) / 2;
@@ -44,6 +46,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
   isSidebarOpen,
+  isGlobalGreen,
+  onToggleGlobalGreen,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -228,9 +232,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     if (innerGroup) {
       innerGroup.removeAttribute('transform');
     }
-    clone.setAttribute('width', '2600');
-    clone.setAttribute('height', '1450');
-    clone.setAttribute('viewBox', '0 0 2600 1450');
+    clone.setAttribute('width', '2690');
+    clone.setAttribute('height', '1460');
+    clone.setAttribute('viewBox', '30 20 2690 1460');
     return clone;
   };
 
@@ -258,14 +262,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     const url = URL.createObjectURL(svgBlob);
 
     img.onload = () => {
-      const baseWidth = 2600;
-      const baseHeight = 1450;
+      const baseWidth = 2690;
+      const baseHeight = 1460;
       canvas.width = baseWidth * scale;
       canvas.height = baseHeight * scale;
       
       if (ctx) {
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const pngUrl = canvas.toDataURL("image/png");
         const downloadLink = document.createElement("a");
@@ -319,7 +322,22 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       </div>
 
       {/* Footer UI */}
-      <div className="absolute bottom-6 right-6 z-40 flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300">
+      <div className="absolute bottom-6 right-6 z-40 flex items-center gap-3">
+      <button
+        onClick={() => onToggleGlobalGreen(!isGlobalGreen)}
+        className={`h-12 px-4 flex items-center gap-2 rounded-xl border transition-all duration-200 ${
+          isGlobalGreen
+            ? 'bg-[#009681] border-[#009681] text-white shadow-sm'
+            : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+        }`}
+        title="Toggle all dots green"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      </button>
+      <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300">
         <button 
           onClick={handleZoomOut}
           className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-xl font-light border-r border-slate-100"
@@ -342,6 +360,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           +
         </button>
       </div>
+      </div>
 
       <svg
         ref={svgRef}
@@ -349,10 +368,23 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       >
         <defs>
           <filter id="office-glow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
-            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0.6 0 0 0 0  0 0 0 0 0  0 0 0 0.25 0" result="glow" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0.6 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0" result="glow" />
             <feMerge>
               <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="office-glow-green" x="-800%" y="-800%" width="1700%" height="1700%">
+            <feMorphology in="SourceGraphic" operator="dilate" radius="12" result="whiteSrc" />
+            <feGaussianBlur in="whiteSrc" stdDeviation="28" result="whiteBlur" />
+            <feColorMatrix in="whiteBlur" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.65 0" result="whiteGlow" />
+            <feMorphology in="SourceGraphic" operator="dilate" radius="4" result="greenSrc" />
+            <feGaussianBlur in="greenSrc" stdDeviation="8" result="greenBlur" />
+            <feColorMatrix in="greenBlur" type="matrix" values="0 0 0 0 0.7  0 0 0 0 1  0 0 0 0 0.95  0 0 0 0.7 0" result="greenGlow" />
+            <feMerge>
+              <feMergeNode in="whiteGlow" />
+              <feMergeNode in="greenGlow" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
@@ -360,7 +392,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         <g>
           <g id="grid-dots">
             {MAP_DOTS.map((dot, i) => {
-              const isActive = activeDotIndices.has(i);
+              const isActive = isGlobalGreen || activeDotIndices.has(i);
               return (
                 <circle
                   key={`dot-${i}`}
@@ -378,16 +410,23 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           <g id="offices">
             {allOfficeMarkers.map((office) => {
               const isVisible = activeOfficeCountries.has(office.id);
+              const officeColor = isGlobalGreen ? '#0BEAC5' : '#f97316';
+              const officeGlow = isGlobalGreen ? 'url(#office-glow-green)' : 'url(#office-glow)';
               return (
                 <circle
                   key={office.id}
                   cx={office.snappedX}
                   cy={office.snappedY}
-                  r={12}
-                  fill="#f97316"
+                  r={isVisible ? (isGlobalGreen ? 14.4 : 12) : 6}
+                  fill={isVisible ? officeColor : '#d5d4d4'}
                   opacity={isVisible ? 1 : 0}
-                  filter={isVisible ? 'url(#office-glow)' : 'none'}
-                  style={{ stroke: 'none', transition: 'opacity 150ms ease' }}
+                  filter={isVisible ? officeGlow : 'none'}
+                  style={{
+                    stroke: 'none',
+                    transition: isVisible
+                      ? 'r 200ms ease-out, fill 150ms ease, opacity 100ms ease, filter 150ms ease'
+                      : 'r 200ms ease-in, fill 150ms ease 50ms, opacity 150ms ease 100ms, filter 50ms ease',
+                  }}
                   pointerEvents={isVisible ? 'auto' : 'none'}
                 />
               );

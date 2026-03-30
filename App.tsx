@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [selectedContinents, setSelectedContinents] = useState<ContinentName[]>([]);
+  const [isGlobalGreen, setIsGlobalGreen] = useState(false);
 
   const toggleOffice = (id: string) => {
     setSelectedOffices(prev => 
@@ -39,11 +40,18 @@ const App: React.FC = () => {
   };
 
   const toggleContinent = (continent: ContinentName) => {
-    setSelectedContinents(prev =>
-      prev.includes(continent)
+    setSelectedContinents(prev => {
+      const next = prev.includes(continent)
         ? prev.filter(name => name !== continent)
-        : [...prev, continent]
-    );
+        : [...prev, continent];
+      if (next.length < CONTINENT_OPTIONS.length) setIsGlobalGreen(false);
+      return next;
+    });
+  };
+
+  const toggleGlobalGreen = (on: boolean) => {
+    setIsGlobalGreen(on);
+    setSelectedContinents(on ? [...CONTINENT_OPTIONS] : []);
   };
 
   const currentOfficeObjects = useMemo(() => {
@@ -81,6 +89,8 @@ const App: React.FC = () => {
           selectedOffices={currentOfficeObjects}
           selectedCountries={activeRegionCountries}
           isSidebarOpen={isSidebarOpen}
+          isGlobalGreen={isGlobalGreen}
+          onToggleGlobalGreen={toggleGlobalGreen}
         />
       </main>
     </div>
