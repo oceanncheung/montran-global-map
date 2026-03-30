@@ -5,12 +5,14 @@ import MapCanvas from './components/MapCanvas';
 import { SidebarTab } from './types';
 import { MONTRAN_OFFICES } from './constants';
 import { COUNTRY_NAMES } from './utils/mappings';
+import { CONTINENT_COUNTRY_MAP, CONTINENT_OPTIONS, ContinentName } from './utils/continents';
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.OFFICES);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [selectedContinents, setSelectedContinents] = useState<ContinentName[]>([]);
 
   const toggleOffice = (id: string) => {
     setSelectedOffices(prev => 
@@ -36,9 +38,24 @@ const App: React.FC = () => {
     setSelectedCountries(prev => prev.filter(c => c !== name));
   };
 
+  const toggleContinent = (continent: ContinentName) => {
+    setSelectedContinents(prev =>
+      prev.includes(continent)
+        ? prev.filter(name => name !== continent)
+        : [...prev, continent]
+    );
+  };
+
   const currentOfficeObjects = useMemo(() => {
     return MONTRAN_OFFICES.filter(o => selectedOffices.includes(o.id));
   }, [selectedOffices]);
+
+  const activeRegionCountries = useMemo(() => {
+    return Array.from(new Set([
+      ...selectedCountries,
+      ...selectedContinents.flatMap((continent) => CONTINENT_COUNTRY_MAP[continent]),
+    ]));
+  }, [selectedCountries, selectedContinents]);
 
   return (
     <div className="flex w-screen h-screen bg-white overflow-hidden relative">
@@ -51,15 +68,19 @@ const App: React.FC = () => {
         toggleOffice={toggleOffice}
         toggleAllOffices={toggleAllOffices}
         selectedCountries={selectedCountries}
+        selectedContinents={selectedContinents}
         addCountry={addCountry}
         removeCountry={removeCountry}
+        toggleContinent={toggleContinent}
         allCountryNames={COUNTRY_NAMES}
+        continentNames={CONTINENT_OPTIONS}
       />
       
       <main className="flex-1 relative overflow-hidden flex flex-col">
         <MapCanvas 
           selectedOffices={currentOfficeObjects}
-          selectedCountries={selectedCountries}
+          selectedCountries={activeRegionCountries}
+          isSidebarOpen={isSidebarOpen}
         />
       </main>
     </div>

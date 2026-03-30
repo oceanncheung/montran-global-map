@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { SidebarTab } from '../types';
 import { MONTRAN_OFFICES, MontranOffice } from '../constants';
+import { ContinentName } from '../utils/continents';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -11,9 +12,12 @@ interface SidebarProps {
   toggleOffice: (id: string) => void;
   toggleAllOffices: () => void;
   selectedCountries: string[];
+  selectedContinents: ContinentName[];
   addCountry: (name: string) => void;
   removeCountry: (name: string) => void;
+  toggleContinent: (name: ContinentName) => void;
   allCountryNames: string[];
+  continentNames: readonly ContinentName[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -25,9 +29,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   toggleOffice,
   toggleAllOffices,
   selectedCountries,
+  selectedContinents,
   addCountry,
   removeCountry,
-  allCountryNames
+  toggleContinent,
+  allCountryNames,
+  continentNames
 }) => {
   const [countrySearch, setCountrySearch] = useState('');
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Corporate HQ']);
@@ -211,48 +218,79 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <div className="text-left">
-              <p className="text-display-9 tracking-tight text-slate-600 border-b-2 border-slate-100 py-4 mb-6">
-                Territory Lookup
-              </p>
-              
               <div className="space-y-8">
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Search countries..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
-                    value={countrySearch}
-                    onChange={(e) => setCountrySearch(e.target.value)}
-                  />
-                  {filteredCountries.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 overflow-hidden">
-                      {filteredCountries.map(name => (
-                        <div 
-                          key={name}
-                          onClick={() => {
-                            addCountry(name);
-                            setCountrySearch('');
-                          }}
-                          className="px-5 py-4 text-display-9 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 text-slate-700"
-                        >
-                          {name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="space-y-6">
+                  <p className="text-display-9 tracking-tight text-slate-600 border-b-2 border-slate-100 py-4">
+                    By Country
+                  </p>
+
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="Search countries..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
+                      value={countrySearch}
+                      onChange={(e) => setCountrySearch(e.target.value)}
+                    />
+                    {filteredCountries.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 overflow-hidden">
+                        {filteredCountries.map(name => (
+                          <div 
+                            key={name}
+                            onClick={() => {
+                              addCountry(name);
+                              setCountrySearch('');
+                            }}
+                            className="px-5 py-4 text-display-9 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 text-slate-700"
+                          >
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCountries.map(name => (
+                      <button 
+                        key={name}
+                        onClick={() => removeCountry(name)}
+                        className="flex items-center gap-2 bg-[#009681] text-white border border-transparent px-4 py-2.5 rounded-full text-[16px] hover:bg-[#009681]/10 hover:text-[#009681] hover:border-[#009681]/20 transition-all group shadow-sm active:scale-95"
+                      >
+                        {name}
+                        <svg className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {selectedCountries.map(name => (
-                    <button 
-                      key={name}
-                      onClick={() => removeCountry(name)}
-                      className="flex items-center gap-2 bg-[#009681] text-white border border-transparent px-4 py-2.5 rounded-full text-[16px] hover:bg-[#009681]/10 hover:text-[#009681] hover:border-[#009681]/20 transition-all group shadow-sm active:scale-95"
-                    >
-                      {name}
-                      <svg className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                  ))}
+                <div className="space-y-6">
+                  <p className="text-display-9 tracking-tight text-slate-600 border-b-2 border-slate-100 py-4">
+                    By Continent
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {continentNames.map((continent) => {
+                      const isSelected = selectedContinents.includes(continent);
+
+                      return (
+                        <button
+                          key={continent}
+                          onClick={() => toggleContinent(continent)}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-[16px] border transition-all group active:scale-95 ${
+                            isSelected
+                              ? 'bg-[#009681] text-white border-transparent shadow-sm hover:bg-[#009681]/10 hover:text-[#009681] hover:border-[#009681]/20'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-[#009681]/30 hover:text-[#009681]'
+                          }`}
+                        >
+                          {continent}
+                          {isSelected && (
+                            <svg className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

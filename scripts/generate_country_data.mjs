@@ -34,24 +34,303 @@ const VISUAL_REGION_RULES = [
       // The British Isles are highly compressed in the artwork, so the UK
       // needs a few shared dots to feel like Great Britain instead of a thin spine.
       'United Kingdom': {
-        add: [1073, 1151, 1247],
+        add: [994, 1005, 1006, 1073, 1151, 1247],
+      },
+      // Ireland reads better as its own 3-dot island without borrowing the
+      // shared UK spine dots.
+      Ireland: {
+        replace: [1077, 1150, 1186],
+      },
+    },
+  },
+  {
+    name: 'North Atlantic Seam',
+    countries: {
+      // One seam dot sits visually against Greenland on this artwork and reads
+      // like part of the Arctic arc rather than a separate island cluster.
+      Greenland: {
+        add: [642],
+      },
+    },
+  },
+  {
+    name: 'Canadian Arctic Archipelago',
+    countries: {
+      // On this stylized map, the western seam of Greenland actually reads like
+      // Canada's high-arctic island chain. The upper rows read Canadian farther
+      // east, while the lower rows only read Canadian on the west side of the
+      // archipelago. Split it that way so the seam follows the visible water.
+      Canada: {
+        add: [
+          2, 10, 16, 31, 32, 44, 49, 60, 71, 77, 86, 92,
+          110, 111, 112, 130, 137, 164, 175, 224, 236,
+          241, 251, 262, 305, 319, 342, 343, 352, 359, 369, 415, 459,
+          483, 516, 603, 640,
+        ],
+      },
+      Greenland: {
+        remove: [
+          2, 10, 16, 31, 32, 44, 49, 60, 71, 77, 86, 92,
+          110, 111, 112, 130, 137, 164, 175, 224, 236,
+          241, 251, 262, 305, 319, 342, 343, 352, 359, 369, 415, 459,
+          483, 516, 603, 640,
+        ],
+      },
+    },
+  },
+  {
+    name: 'European Arctic',
+    countries: {
+      // The stylized Arctic islands north of Scandinavia and Russia read much
+      // more like Norway/Russia than the inland countries they were pulled into
+      // by the automatic pass.
+      Norway: {
+        add: [994, 995, 996, 1005, 1006, 1007, 1008],
+      },
+      'Faroe Islands': {
+        remove: [994],
+      },
+      Estonia: {
+        remove: [995, 996],
+      },
+      Lithuania: {
+        remove: [1007],
+      },
+      Latvia: {
+        remove: [1008],
+      },
+      Russia: {
+        add: [
+          1076, 1083, 1100, 1104, 1119, 1126, 1141, 1147, 1153, 1154,
+          1161, 1169, 1170, 1172, 1178, 1179, 1191, 1194, 1215, 1216,
+          1248, 1255,
+        ],
+      },
+      Belarus: {
+        remove: [1104],
+      },
+      Kazakhstan: {
+        remove: [1083, 1100, 1119, 1126, 1141],
+      },
+      China: {
+        remove: [1076],
+      },
+      Ukraine: {
+        remove: [1153, 1154, 1191, 1248, 1255],
+      },
+    },
+  },
+  {
+    name: 'Nordic Atlantic and Baltics',
+    countries: {
+      // Keep Norway on the Scandinavia-facing island chain and avoid letting it
+      // drift into the far-west North Atlantic dots above the UK.
+      Norway: {
+        remove: [994, 995, 996, 1005, 1006, 1007, 1008],
+      },
+      Finland: {
+        add: [995, 996, 1007, 1008],
+      },
+      // Keep the tiny Baltic states on the mainland coastline instead of on
+      // Arctic bridge dots created by the ownership completion pass.
+      Estonia: {
+        replace: [1074],
+      },
+      Latvia: {
+        replace: [1153],
+      },
+      Lithuania: {
+        replace: [1190, 1248],
+      },
+      // The Faroe Islands are a single shared North Atlantic dot on this art.
+      'Faroe Islands': {
+        replace: [994],
+      },
+      Mauritania: {
+        remove: [1005, 1006],
+      },
+    },
+  },
+  {
+    name: 'Caribbean Continent Split',
+    countries: {
+      // Keep the North America continent selection off the northern South
+      // America shoreline by pulling the small Caribbean territories back onto
+      // shared Caribbean dots instead of Venezuela-adjacent dots.
+      Haiti: {
+        replace: [2015],
+      },
+      'Dominican Republic': {
+        replace: [2015],
+      },
+      'Turks and Caicos Islands': {
+        replace: [2015],
+      },
+      'Puerto Rico': {
+        replace: [2015],
+      },
+      'Trinidad and Tobago': {
+        replace: [2015],
+      },
+      'Saint Martin': {
+        replace: [2006],
+      },
+      'Sint Maarten': {
+        replace: [2006],
+      },
+      'Curaçao': {
+        replace: [2006],
+      },
+      Aruba: {
+        replace: [2006],
+      },
+      Grenada: {
+        replace: [2006],
+      },
+      'Saint Vincent and the Grenadines': {
+        replace: [2006],
+      },
+      Barbados: {
+        replace: [2006],
+      },
+      'Saint Lucia': {
+        replace: [2006],
+      },
+      Dominica: {
+        replace: [2006],
+      },
+      Montserrat: {
+        replace: [2006],
+      },
+      'Antigua and Barbuda': {
+        replace: [2006],
+      },
+      'Saint Kitts and Nevis': {
+        replace: [2006],
+      },
+      'United States Virgin Islands': {
+        replace: [2006],
+      },
+      'Saint Barthelemy': {
+        replace: [2006],
+      },
+      Anguilla: {
+        replace: [2006],
+      },
+      'British Virgin Islands': {
+        replace: [2006],
+      },
+    },
+  },
+  {
+    name: 'South Pacific Representation',
+    countries: {
+      // These small Pacific countries should read as Oceania on the artwork,
+      // not as scattered dots above Australia or on the Americas side.
+      Palau: {
+        replace: [2453],
+      },
+      Guam: {
+        replace: [2453],
+      },
+      'Northern Mariana Islands': {
+        replace: [2453],
+      },
+      'Federated States of Micronesia': {
+        replace: [2456],
+      },
+      Kiribati: {
+        replace: [2456],
+      },
+      'Marshall Islands': {
+        replace: [2456],
+      },
+      Nauru: {
+        replace: [2456],
+      },
+      'Solomon Islands': {
+        replace: [2549],
+      },
+      'American Samoa': {
+        replace: [2667],
+      },
+      'Cook Islands': {
+        replace: [2667],
+      },
+      Niue: {
+        replace: [2667],
+      },
+      Samoa: {
+        replace: [2667],
+      },
+      Tonga: {
+        replace: [2667],
+      },
+      'Wallis and Futuna': {
+        replace: [2667],
+      },
+      'French Polynesia': {
+        replace: [2683],
+      },
+      'Pitcairn Islands': {
+        replace: [2683],
+      },
+    },
+  },
+  {
+    name: 'Southeast Asia and Oceania Boundary',
+    countries: {
+      // On this stylized map, Australia should stay visually pure and the
+      // islands north of it should carry the Asia/Oceania mental map. Keep
+      // East Timor on the Indonesia chain and move Papua New Guinea onto the
+      // far-right island cluster instead of borrowing Australia mainland dots.
+      Indonesia: {
+        remove: [2234, 2240, 2275, 2285, 2293, 2298],
+      },
+      'Papua New Guinea': {
+        replace: [2234, 2240, 2275, 2285, 2293, 2298],
+      },
+      'East Timor': {
+        replace: [2255],
+      },
+    },
+  },
+  {
+    name: 'Florida and Bahamas',
+    countries: {
+      // The stylized Southeast US / Bahamas cluster is too sparse to separate
+      // cleanly, so let Miami and the Bahamas share the same seam dot.
+      'United States of America': {
+        add: [1906],
+      },
+      'The Bahamas': {
+        add: [1906],
       },
     },
   },
   {
     name: 'Korean Peninsula',
     countries: {
-      // Keep Korea intentionally tiny on this artwork: use the 3-dot chain
-      // just to the left of Japan so the peninsula sits lower and reads
-      // closer to the real-world relationship between China, Korea, and Japan.
+      // Keep Korea intentionally tiny on this artwork: use the lower 3-dot
+      // peninsula chain just left of Japan so it reads below China instead of
+      // floating too high.
       China: {
-        remove: [1486, 1528],
+        remove: [1596, 1653, 1658],
       },
       'North Korea': {
-        replace: [1428, 1486],
+        replace: [1596, 1653],
       },
       'South Korea': {
-        replace: [1486, 1528],
+        replace: [1653, 1658],
+      },
+    },
+  },
+  {
+    name: 'China East Edge',
+    countries: {
+      // The far-east coastal tip reads as part of China's stylized outline.
+      China: {
+        add: [1465],
       },
     },
   },
@@ -90,6 +369,64 @@ const VISUAL_REGION_RULES = [
       },
     },
   },
+  {
+    name: 'Maghreb Atlantic Coast',
+    countries: {
+      // Western Sahara reads more clearly when it occupies the lower coastal
+      // chain instead of sitting inside Morocco's footprint.
+      Morocco: {
+        replace: [1655, 1710, 1719, 1790, 1828, 1900],
+      },
+      'Western Sahara': {
+        replace: [1849, 1889, 1901],
+      },
+    },
+  },
+  {
+    name: 'Northern Andes',
+    countries: {
+      // Brazil's north coast can creep too far toward the Caribbean on this
+      // artwork, while Ecuador and Bolivia need more shared Andes dots to feel
+      // proportionate.
+      Brazil: {
+        remove: [2198, 2199],
+      },
+      Ecuador: {
+        replace: [2250, 2280, 2288, 2290],
+      },
+      Bolivia: {
+        replace: [
+          2382, 2394, 2426, 2431, 2435, 2465, 2466, 2472, 2483, 2492,
+          2495, 2504, 2511, 2525, 2528, 2533, 2544, 2556, 2563,
+        ],
+      },
+    },
+  },
+  {
+    name: 'Guiana Coast',
+    countries: {
+      // Fill the last north-coast seam dot so continent unions do not leave a
+      // grey hole between Venezuela, Guyana, and Brazil.
+      Guyana: {
+        add: [2198],
+      },
+    },
+  },
+  {
+    name: 'South Asia Connections',
+    countries: {
+      // Nepal reads more clearly as a short connected strip instead of two
+      // separated diagonal dots.
+      Nepal: {
+        replace: [1730, 1764, 1765],
+      },
+      // Northeast India needs one bridge dot so the eastern pair reads as
+      // connected to mainland India.
+      India: {
+        add: [1780],
+      },
+    },
+  },
 ];
 
 const DOT_SAMPLE_OFFSETS = [
@@ -103,6 +440,8 @@ const DOT_SAMPLE_OFFSETS = [
   [-3.5, 3.5],
   [-3.5, -3.5],
 ];
+
+const DOT_COMPLETION_DISTANCE_LIMIT = 90;
 
 const getCountryName = (feature) =>
   feature?.properties?.ADMIN ||
@@ -312,6 +651,268 @@ const getFeatureShapePoints = (feature, constants) => {
   return points;
 };
 
+const sortUniqueDots = (dotIndexes) => Array.from(new Set(dotIndexes)).sort((a, b) => a - b);
+
+const applyVisualRegionRules = (mapping) => {
+  for (const region of VISUAL_REGION_RULES) {
+    for (const [countryName, rule] of Object.entries(region.countries ?? {})) {
+      if (!rule) continue;
+
+      const baseDots = rule.replace?.length ? rule.replace : (mapping[countryName] ?? []);
+      const addDots = rule.add ?? [];
+      const removeDots = new Set(rule.remove ?? []);
+
+      mapping[countryName] = sortUniqueDots(
+        [...baseDots, ...addDots].filter((dotIndex) => !removeDots.has(dotIndex)),
+      );
+    }
+  }
+};
+
+const pickRepresentativeDot = ({
+  countryName,
+  feature,
+  dotCoords,
+  constants,
+}) => {
+  const overrideDots = REPRESENTATIVE_DOT_OVERRIDES[countryName];
+  if (overrideDots?.length) {
+    return {
+      mode: 'override',
+      dots: [...overrideDots],
+    };
+  }
+
+  if (REPRESENTATIVE_DOT_EXCLUSIONS.has(countryName)) {
+    return null;
+  }
+
+  const representativePoints = getRepresentativePoints(feature, constants);
+  const shapePoints = getFeatureShapePoints(feature, constants);
+  let best = null;
+
+  for (const dot of dotCoords) {
+    let bestPointDistance = Infinity;
+
+    for (const point of representativePoints) {
+      const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
+      if (distance < bestPointDistance) {
+        bestPointDistance = distance;
+      }
+    }
+
+    if (!best || bestPointDistance < best.distance) {
+      best = {
+        dotIndex: dot.index,
+        distance: bestPointDistance,
+      };
+    }
+  }
+
+  if ((!best || best.distance > REPRESENTATIVE_DOT_DISTANCE_LIMIT) && shapePoints.length > 0) {
+    for (const dot of dotCoords) {
+      let bestShapeDistance = Infinity;
+
+      for (const point of shapePoints) {
+        const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
+        if (distance < bestShapeDistance) {
+          bestShapeDistance = distance;
+        }
+      }
+
+      if (!best || bestShapeDistance < best.distance) {
+        best = {
+          dotIndex: dot.index,
+          distance: bestShapeDistance,
+        };
+      }
+    }
+  }
+
+  if (!best) {
+    return null;
+  }
+
+  return {
+    mode: best.distance <= SHAPE_SAMPLE_DISTANCE_LIMIT ? 'nearest-shared-dot' : 'remote-nearest-shared-dot',
+    dots: [best.dotIndex],
+    distance: Number(best.distance.toFixed(2)),
+  };
+};
+
+const assignRepresentativeDots = ({
+  mapping,
+  featureMeta,
+  dotCoords,
+  constants,
+  representativeDotAssignments,
+}) => {
+  for (const { name, feature } of featureMeta) {
+    if (mapping[name]?.length) continue;
+
+    const pick = pickRepresentativeDot({
+      countryName: name,
+      feature,
+      dotCoords,
+      constants,
+    });
+
+    if (!pick?.dots?.length) continue;
+
+    mapping[name] = sortUniqueDots(pick.dots);
+    representativeDotAssignments[name] = pick;
+  }
+};
+
+const buildOwnersByDot = (mapping, dotCount) => {
+  const ownersByDot = Array.from({ length: dotCount }, () => []);
+
+  for (const [countryName, dotIndexes] of Object.entries(mapping)) {
+    for (const dotIndex of dotIndexes) {
+      ownersByDot[dotIndex].push(countryName);
+    }
+  }
+
+  return ownersByDot;
+};
+
+const fillUnassignedDotComponents = ({
+  mapping,
+  components,
+  dotCoords,
+  featureMeta,
+  constants,
+}) => {
+  const ownersByDot = buildOwnersByDot(mapping, dotCoords.length);
+
+  for (const component of components) {
+    const unownedDots = component.filter((dotIndex) => ownersByDot[dotIndex].length === 0);
+    if (!unownedDots.length) continue;
+
+    const nearbyCountryScores = new Map();
+
+    for (const missingDotIndex of unownedDots) {
+      const missingDot = dotCoords[missingDotIndex];
+
+      for (let candidateIndex = 0; candidateIndex < dotCoords.length; candidateIndex += 1) {
+        if (!ownersByDot[candidateIndex].length) continue;
+
+        const candidateDot = dotCoords[candidateIndex];
+        const distance = Math.hypot(candidateDot.x - missingDot.x, candidateDot.y - missingDot.y);
+
+        if (distance > DOT_COMPLETION_DISTANCE_LIMIT) continue;
+
+        for (const countryName of ownersByDot[candidateIndex]) {
+          nearbyCountryScores.set(
+            countryName,
+            (nearbyCountryScores.get(countryName) ?? 0) + (DOT_COMPLETION_DISTANCE_LIMIT - distance),
+          );
+        }
+      }
+    }
+
+    let bestCountryName = null;
+
+    if (nearbyCountryScores.size > 0) {
+      bestCountryName = Array.from(nearbyCountryScores.entries())
+        .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    } else {
+      const centroid = unownedDots.reduce(
+        (acc, dotIndex) => {
+          acc.x += dotCoords[dotIndex].x;
+          acc.y += dotCoords[dotIndex].y;
+          return acc;
+        },
+        { x: 0, y: 0 },
+      );
+      centroid.x /= unownedDots.length;
+      centroid.y /= unownedDots.length;
+
+      let bestDistance = Infinity;
+
+      for (const { name, feature } of featureMeta) {
+        if (REPRESENTATIVE_DOT_EXCLUSIONS.has(name)) continue;
+
+        const candidatePoints = [
+          ...getRepresentativePoints(feature, constants),
+          ...getFeatureShapePoints(feature, constants),
+        ];
+
+        for (const point of candidatePoints) {
+          const distance = Math.hypot(point.pixel.x - centroid.x, point.pixel.y - centroid.y);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestCountryName = name;
+          }
+        }
+      }
+    }
+
+    if (!bestCountryName) continue;
+
+    mapping[bestCountryName] = sortUniqueDots([
+      ...(mapping[bestCountryName] ?? []),
+      ...unownedDots,
+    ]);
+
+    for (const dotIndex of unownedDots) {
+      ownersByDot[dotIndex].push(bestCountryName);
+    }
+  }
+};
+
+const applyCanadaGreenlandArcticSeam = ({
+  mapping,
+  dotCoords,
+}) => {
+  const candidateDots = dotCoords
+    .filter((dot) => dot.x >= 900 && dot.x <= 1205 && dot.y <= 360)
+    .map((dot) => dot.index);
+
+  const canadaDots = new Set((mapping.Canada ?? []).filter((dotIndex) => !candidateDots.includes(dotIndex)));
+  const greenlandDots = new Set((mapping.Greenland ?? []).filter((dotIndex) => !candidateDots.includes(dotIndex)));
+
+  for (const dotIndex of candidateDots) {
+    const dot = dotCoords[dotIndex];
+
+    if (dot.x >= 1000) {
+      greenlandDots.add(dotIndex);
+    } else {
+      canadaDots.add(dotIndex);
+    }
+  }
+
+  // The Canada/Greenland seam is not a clean vertical split on this artwork.
+  // The high-arctic east strip reads as Greenland, while the lower Labrador
+  // edge swings back to Canada.
+  // Must cover every index Canada: { add: [...] } forces onto Canada in
+  // applyVisualRegionRules, or those dots stay Canadian after the seam pass.
+  // Do NOT list dots here that should remain Canada on the artwork (893–915 seam
+  // column, Baffin/Labrador strip, etc.); see committed utils/countryData.ts.
+  const greenlandWestArcDots = [
+    2, 31, 32, 44, 49, 60, 71, 77, 86, 91, 92,
+    110, 111, 112, 130, 137, 164, 175, 224, 289, 320, 434, 518, 622,
+    759, 963,
+  ];
+  // Pulls dots back onto Canada after the west-arc pass (e.g. top-of-archipelago seam
+  // dot 2 should stay Canadian; was only in Greenland because it is listed in the arc).
+  // 211/252 stay Greenland (main island column); do not force them onto Canada.
+  const canadaEastEdgeDots = [2, 369, 415, 483, 603, 701];
+
+  for (const dotIndex of greenlandWestArcDots) {
+    canadaDots.delete(dotIndex);
+    greenlandDots.add(dotIndex);
+  }
+
+  for (const dotIndex of canadaEastEdgeDots) {
+    greenlandDots.delete(dotIndex);
+    canadaDots.add(dotIndex);
+  }
+
+  mapping.Canada = sortUniqueDots([...canadaDots]);
+  mapping.Greenland = sortUniqueDots([...greenlandDots]);
+};
+
 const generateCountryData = async () => {
   const [constants, dots, geoData] = await Promise.all([
     parseGeoConstants(),
@@ -507,89 +1108,43 @@ const generateCountryData = async () => {
   }
 
   const representativeDotAssignments = {};
+  assignRepresentativeDots({
+    mapping,
+    featureMeta,
+    dotCoords,
+    constants,
+    representativeDotAssignments,
+  });
 
-  for (const { name, feature } of featureMeta) {
-    if (mapping[name]) continue;
+  applyVisualRegionRules(mapping);
 
-    const overrideDots = REPRESENTATIVE_DOT_OVERRIDES[name];
-    if (overrideDots?.length) {
-      mapping[name] = [...overrideDots];
-      representativeDotAssignments[name] = {
-        mode: 'override',
-        dots: [...overrideDots],
-      };
-      continue;
-    }
+  applyCanadaGreenlandArcticSeam({
+    mapping,
+    dotCoords,
+  });
 
-    if (REPRESENTATIVE_DOT_EXCLUSIONS.has(name)) continue;
+  fillUnassignedDotComponents({
+    mapping,
+    components,
+    dotCoords,
+    featureMeta,
+    constants,
+  });
 
-    const representativePoints = getRepresentativePoints(feature, constants);
-    const shapePoints = getFeatureShapePoints(feature, constants);
-    let best = null;
+  applyVisualRegionRules(mapping);
 
-    for (const dot of dotCoords) {
-      let bestPointDistance = Infinity;
+  applyCanadaGreenlandArcticSeam({
+    mapping,
+    dotCoords,
+  });
 
-      for (const point of representativePoints) {
-        const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
-        if (distance < bestPointDistance) {
-          bestPointDistance = distance;
-        }
-      }
-
-      if (!best || bestPointDistance < best.distance) {
-        best = {
-          dotIndex: dot.index,
-          distance: bestPointDistance,
-        };
-      }
-    }
-
-    if ((!best || best.distance > REPRESENTATIVE_DOT_DISTANCE_LIMIT) && shapePoints.length > 0) {
-      for (const dot of dotCoords) {
-        let bestShapeDistance = Infinity;
-
-        for (const point of shapePoints) {
-          const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
-          if (distance < bestShapeDistance) {
-            bestShapeDistance = distance;
-          }
-        }
-
-        if (!best || bestShapeDistance < best.distance) {
-          best = {
-            dotIndex: dot.index,
-            distance: bestShapeDistance,
-          };
-        }
-      }
-    }
-
-    if (!best) {
-      continue;
-    }
-
-    mapping[name] = [best.dotIndex];
-    representativeDotAssignments[name] = {
-      mode: best.distance <= SHAPE_SAMPLE_DISTANCE_LIMIT ? 'nearest-shared-dot' : 'remote-nearest-shared-dot',
-      dots: [best.dotIndex],
-      distance: Number(best.distance.toFixed(2)),
-    };
-  }
-
-  for (const region of VISUAL_REGION_RULES) {
-    for (const [countryName, rule] of Object.entries(region.countries ?? {})) {
-      if (!rule) continue;
-
-      const baseDots = rule.replace?.length ? rule.replace : (mapping[countryName] ?? []);
-      const addDots = rule.add ?? [];
-      const removeDots = new Set(rule.remove ?? []);
-
-      mapping[countryName] = Array.from(
-        new Set([...baseDots, ...addDots].filter((dotIndex) => !removeDots.has(dotIndex))),
-      ).sort((a, b) => a - b);
-    }
-  }
+  assignRepresentativeDots({
+    mapping,
+    featureMeta,
+    dotCoords,
+    constants,
+    representativeDotAssignments,
+  });
 
   const mappedCountryCount = Object.keys(mapping).length;
   const uniqueMappedDotCount = new Set(Object.values(mapping).flat()).size;

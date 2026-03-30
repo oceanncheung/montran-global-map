@@ -1,7 +1,7 @@
 
 export enum SidebarTab {
   OFFICES = 'Offices',
-  COUNTRIES = 'Countries'
+  COUNTRIES = 'Region'
 }
 
 export interface OfficeLocation {
@@ -11,6 +11,7 @@ export interface OfficeLocation {
   region: string;
   country: string;
   markerAnchor?: boolean;
+  markerDotIndex?: number;
   lat: number;
   lng: number;
 }

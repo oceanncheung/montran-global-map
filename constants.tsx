@@ -6,7 +6,7 @@ export interface MontranOffice extends OfficeLocation {
 }
 
 export const MONTRAN_OFFICES: MontranOffice[] = [
-  { id: 'ny-hq', name: 'Montran Corporation', city: 'New York City', address: '', region: 'Corporate HQ', country: 'United States of America', markerAnchor: true, lat: 40.7517, lng: -73.9795 },
+  { id: 'ny-hq', name: 'Montran Corporation', city: 'New York City', address: '', region: 'Corporate HQ', country: 'United States of America', markerAnchor: true, markerDotIndex: 1468, lat: 40.7517, lng: -73.9795 },
   { id: 'nj-branch', name: 'Montran New Jersey', city: 'Princeton', address: '', region: 'Americas', country: 'United States of America', lat: 40.3415, lng: -74.6144 },
   { id: 'ct-branch', name: 'Montran Connecticut', city: 'Norwalk', address: '', region: 'Americas', country: 'United States of America', lat: 41.1468, lng: -73.4948 },
   { id: 'latam-branch', name: 'Montran LATAM', city: 'Quito', address: '', region: 'Americas', country: 'Ecuador', lat: -0.2045, lng: -78.4855 },

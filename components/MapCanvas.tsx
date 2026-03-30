@@ -9,21 +9,51 @@ import { MANUAL_MAPPINGS } from '../utils/mappings';
 interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
+  isSidebarOpen: boolean;
 }
 
-const DEFAULT_ZOOM = 0.8;
+const MAP_CONTENT_CENTER_X = (83 + 2668) / 2;
+const MAP_CONTENT_CENTER_Y = (71 + 1430) / 2;
+const MAP_FIT_WIDTH = 2668 - 83 + 160;
+const MAP_FIT_HEIGHT = 1430 - 71 + 160;
+
+const SIDEBAR_WIDTH = 360;
+const SIDEBAR_MARGIN = 24;
+const SIDEBAR_GAP = 24;
+
+const CONTENT_PADDING = 120;
+const TOP_CLEARANCE = 120;
+const BOTTOM_CLEARANCE = 72;
+
+const DEFAULT_VIEW_FRAME = {
+  open: {
+    left: SIDEBAR_WIDTH + SIDEBAR_MARGIN + SIDEBAR_GAP,
+    right: CONTENT_PADDING,
+    top: TOP_CLEARANCE,
+    bottom: BOTTOM_CLEARANCE,
+  },
+  closed: {
+    left: CONTENT_PADDING,
+    right: CONTENT_PADDING,
+    top: TOP_CLEARANCE,
+    bottom: BOTTOM_CLEARANCE,
+  },
+} as const;
 
 const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
-  selectedCountries
+  selectedCountries,
+  isSidebarOpen,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const currentTransformRef = useRef<d3.ZoomTransform | null>(null);
   const defaultTransformRef = useRef<d3.ZoomTransform | null>(null);
+  const hasInitializedDefaultRef = useRef(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [zoomScale, setZoomScale] = useState(DEFAULT_ZOOM);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [defaultScale, setDefaultScale] = useState(1);
 
   // Derived set of indices to highlight based on sidebar selection
   const activeDotIndices = useMemo(() => {
@@ -37,15 +67,23 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     return indices;
   }, [selectedCountries]);
 
-  const snappedOfficeMarkers = useMemo(() => {
+  const allOfficeMarkers = useMemo(() => {
     const dotsWithIndices = MAP_DOTS.map((dot, index) => ({ ...dot, index }));
-    const selectedCountries = Array.from(new Set(selectedOffices.map((office) => office.country)));
+    const countries = Array.from(new Set(MONTRAN_OFFICES.map((o) => o.country)));
 
-    return selectedCountries.map((country) => {
+    return countries.map((country) => {
       const anchorOffice =
-        MONTRAN_OFFICES.find((office) => office.country === country && office.markerAnchor) ??
-        MONTRAN_OFFICES.find((office) => office.country === country) ??
-        selectedOffices.find((office) => office.country === country);
+        MONTRAN_OFFICES.find((o) => o.country === country && o.markerAnchor) ??
+        MONTRAN_OFFICES.find((o) => o.country === country);
+
+      const anchoredDot =
+        anchorOffice?.markerDotIndex !== undefined
+          ? MAP_DOTS[anchorOffice.markerDotIndex]
+          : null;
+
+      if (anchoredDot) {
+        return { id: country, snappedX: anchoredDot.x, snappedY: anchoredDot.y };
+      }
 
       const target = geoToPixel(anchorOffice?.lat ?? 0, anchorOffice?.lng ?? 0);
       const countryDotIndices = MANUAL_MAPPINGS[country];
@@ -56,18 +94,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         : dotsWithIndices;
 
       const chosenDot = candidateDots
-        .map((dot) => ({
-          ...dot,
-          distance: Math.hypot(dot.x - target.x, dot.y - target.y),
-        }))
+        .map((dot) => ({ ...dot, distance: Math.hypot(dot.x - target.x, dot.y - target.y) }))
         .sort((a, b) => a.distance - b.distance)[0];
 
-      return {
-        id: country,
-        snappedX: chosenDot?.x ?? 0,
-        snappedY: chosenDot?.y ?? 0,
-      };
+      return { id: country, snappedX: chosenDot?.x ?? 0, snappedY: chosenDot?.y ?? 0 };
     });
+  }, []);
+
+  const activeOfficeCountries = useMemo(() => {
+    return new Set(selectedOffices.map((o) => o.country));
   }, [selectedOffices]);
 
   const transformsMatch = (a: d3.ZoomTransform | null, b: d3.ZoomTransform | null) => {
@@ -78,6 +113,37 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       Math.abs(a.y - b.y) < 0.01 &&
       Math.abs(a.k - b.k) < 0.001
     );
+  };
+
+  const getDefaultTransform = (width: number, height: number) => {
+    const frame = isSidebarOpen ? DEFAULT_VIEW_FRAME.open : DEFAULT_VIEW_FRAME.closed;
+    const availableWidth = Math.max(width - frame.left - frame.right, 240);
+    const availableHeight = Math.max(height - frame.top - frame.bottom, 240);
+    const fittedScale = Math.min(availableWidth / MAP_FIT_WIDTH, availableHeight / MAP_FIT_HEIGHT);
+    const tx = frame.left + availableWidth / 2 - MAP_CONTENT_CENTER_X * fittedScale;
+    const ty = frame.top + availableHeight / 2 - MAP_CONTENT_CENTER_Y * fittedScale;
+
+    return d3.zoomIdentity.translate(tx, ty).scale(fittedScale);
+  };
+
+  const applyTransform = (
+    selection: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+    transform: d3.ZoomTransform,
+    animate: boolean,
+    duration = 650,
+  ) => {
+    if (!zoomRef.current) return;
+
+    if (animate) {
+      selection
+        .transition()
+        .duration(duration)
+        .ease(d3.easeCubicInOut)
+        .call(zoomRef.current.transform, transform);
+      return;
+    }
+
+    selection.call(zoomRef.current.transform, transform);
   };
 
   useEffect(() => {
@@ -95,30 +161,41 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
     svg.call(zoom);
     zoomRef.current = zoom;
+  }, []);
 
-    const updateCentering = () => {
+  useEffect(() => {
+    if (!svgRef.current || !containerRef.current || !zoomRef.current) return;
+    const svg = d3.select(svgRef.current);
+
+    const computeDefault = () => {
+      const { width, height } = containerRef.current!.getBoundingClientRect();
+      return getDefaultTransform(width, height);
+    };
+
+    const nextDefault = computeDefault();
+    defaultTransformRef.current = nextDefault;
+    setDefaultScale(nextDefault.k);
+    applyTransform(svg, nextDefault, hasInitializedDefaultRef.current, 500);
+    hasInitializedDefaultRef.current = true;
+
+    const handleResize = () => {
       if (!containerRef.current || !zoomRef.current) return;
-      const { width, height } = containerRef.current.getBoundingClientRect();
-      const initialScale = DEFAULT_ZOOM;
-      
-      const tx = (width - 2600 * initialScale) / 2;
-      const ty = (height - 1450 * initialScale) / 2;
-      const nextDefaultTransform = d3.zoomIdentity.translate(tx, ty).scale(initialScale);
-      const shouldRecenter =
+      const resizedDefault = computeDefault();
+      const isAtDefault =
         !currentTransformRef.current ||
         transformsMatch(currentTransformRef.current, defaultTransformRef.current);
 
-      defaultTransformRef.current = nextDefaultTransform;
+      defaultTransformRef.current = resizedDefault;
+      setDefaultScale(resizedDefault.k);
 
-      if (shouldRecenter) {
-        svg.call(zoom.transform, nextDefaultTransform);
+      if (isAtDefault) {
+        applyTransform(svg, resizedDefault, false);
       }
     };
 
-    updateCentering();
-    window.addEventListener('resize', updateCentering);
-    return () => window.removeEventListener('resize', updateCentering);
-  }, []);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarOpen]);
 
   const handleZoomIn = () => {
     if (svgRef.current && zoomRef.current) {
@@ -135,18 +212,12 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const handleResetZoom = () => {
     if (svgRef.current && zoomRef.current && containerRef.current) {
       const { width, height } = containerRef.current.getBoundingClientRect();
-      const targetScale = DEFAULT_ZOOM;
-      const tx = (width - 2600 * targetScale) / 2;
-      const ty = (height - 1450 * targetScale) / 2;
-      const resetTransform = d3.zoomIdentity.translate(tx, ty).scale(targetScale);
+      const resetTransform = getDefaultTransform(width, height);
 
       defaultTransformRef.current = resetTransform;
+      setDefaultScale(resetTransform.k);
 
-      d3.select(svgRef.current)
-        .transition()
-        .duration(750)
-        .ease(d3.easeCubicOut)
-        .call(zoomRef.current.transform, resetTransform);
+      applyTransform(d3.select(svgRef.current), resetTransform, true, 750);
     }
   };
 
@@ -261,7 +332,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           className="px-5 h-12 flex items-center justify-center text-[14px] font-medium text-slate-500 tabular-nums select-none min-w-[64px] hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
           title="Reset to 1x"
         >
-          {(zoomScale / DEFAULT_ZOOM).toFixed(1)}x
+          {(zoomScale / defaultScale).toFixed(1)}x
         </button>
         <button 
           onClick={handleZoomIn}
@@ -274,9 +345,18 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
       <svg
         ref={svgRef}
-        viewBox="0 0 2600 1450"
         className="w-full h-full map-container"
       >
+        <defs>
+          <filter id="office-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
+            <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0.6 0 0 0 0  0 0 0 0 0  0 0 0 0.25 0" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <g>
           <g id="grid-dots">
             {MAP_DOTS.map((dot, i) => {
@@ -290,22 +370,28 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   fill={isActive ? "#009681" : "#d5d4d4"}
                   opacity={isActive ? 1 : 0.8}
                   className="grid-dot"
+                  style={{ transition: 'fill 150ms ease, opacity 150ms ease' }}
                 />
               );
             })}
           </g>
           <g id="offices">
-            {snappedOfficeMarkers.map((office) => (
-              <circle
-                key={office.id}
-                cx={office.snappedX}
-                cy={office.snappedY}
-                r={12} 
-                fill="#f97316"
-                style={{ stroke: 'none' }}
-                className="transition-transform duration-300 transform-gpu"
-              />
-            ))}
+            {allOfficeMarkers.map((office) => {
+              const isVisible = activeOfficeCountries.has(office.id);
+              return (
+                <circle
+                  key={office.id}
+                  cx={office.snappedX}
+                  cy={office.snappedY}
+                  r={12}
+                  fill="#f97316"
+                  opacity={isVisible ? 1 : 0}
+                  filter={isVisible ? 'url(#office-glow)' : 'none'}
+                  style={{ stroke: 'none', transition: 'opacity 150ms ease' }}
+                  pointerEvents={isVisible ? 'auto' : 'none'}
+                />
+              );
+            })}
           </g>
         </g>
       </svg>

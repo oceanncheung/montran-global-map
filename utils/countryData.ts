@@ -394,14 +394,11 @@ export const REPRESENTATIVE_DOT_COUNTRIES: string[] = [
 export const MANUAL_MAPPINGS: CountryDotMap = {
   "Greenland": [
     0,
-    2,
     4,
     8,
-    10,
     11,
     12,
     14,
-    16,
     17,
     18,
     26,
@@ -434,6 +431,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     78,
     79,
     86,
+    91,
     92,
     94,
     96,
@@ -474,14 +472,10 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     220,
     224,
     233,
-    236,
     239,
-    241,
     242,
-    251,
     252,
     253,
-    262,
     267,
     275,
     282,
@@ -489,71 +483,66 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     290,
     294,
     297,
-    305,
     306,
     312,
-    319,
     320,
     328,
     334,
-    342,
-    343,
     344,
-    352,
     353,
-    359,
-    369,
     370,
     379,
     390,
     391,
     405,
-    415,
     416,
     417,
     434,
     435,
-    459,
     460,
     468,
     477,
-    483,
-    516,
-    517,
     518,
     519,
     520,
     521,
     522,
     523,
+    576,
     584,
     592,
-    603,
+    593,
     608,
     622,
     623,
-    640,
-    641,
+    642,
     659,
+    678,
+    689,
     723,
     733,
+    745,
     755,
     759,
     793,
+    794,
     819,
     844,
     869,
     907,
     924,
     963,
-    988
+    988,
   ],
   "Canada": [
     1,
+    2,
     5,
     6,
     7,
     9,
+    10,
+    16,
     20,
     22,
     24,
@@ -562,6 +551,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     33,
     37,
     38,
+    40,
     41,
     42,
     43,
@@ -575,7 +565,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     84,
     85,
     90,
-    91,
     98,
     99,
     106,
@@ -609,29 +598,40 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     227,
     232,
     235,
+    236,
+    241,
     248,
     249,
     250,
+    251,
     261,
+    262,
     266,
     274,
     280,
     281,
     288,
     304,
+    305,
     310,
     311,
     317,
     318,
+    319,
     327,
     333,
     340,
     341,
+    342,
+    343,
+    352,
     357,
     358,
+    359,
     366,
     367,
     368,
+    369,
     378,
     387,
     388,
@@ -640,6 +640,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     412,
     413,
     414,
+    415,
     430,
     431,
     432,
@@ -649,9 +650,11 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     456,
     457,
     458,
+    459,
     467,
     476,
     482,
+    483,
     486,
     495,
     496,
@@ -674,6 +677,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     513,
     514,
     515,
+    516,
+    517,
     575,
     580,
     583,
@@ -683,6 +688,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     590,
     591,
     602,
+    603,
     606,
     607,
     618,
@@ -693,6 +699,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     637,
     638,
     639,
+    640,
+    641,
     655,
     656,
     657,
@@ -885,9 +893,16 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1432,
     1448,
     1458,
-    1501
+    1501,
   ],
   "Russia": [
+    3,
+    13,
+    15,
+    19,
+    21,
+    23,
+    30,
     53,
     57,
     72,
@@ -1388,7 +1403,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1069,
     1071,
     1075,
+    1076,
     1082,
+    1083,
     1084,
     1088,
     1089,
@@ -1397,15 +1414,19 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1092,
     1093,
     1099,
+    1100,
     1101,
+    1104,
     1109,
     1112,
     1113,
     1114,
     1115,
+    1119,
     1120,
     1121,
     1122,
+    1126,
     1127,
     1128,
     1129,
@@ -1414,20 +1435,32 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1137,
     1138,
     1139,
+    1141,
     1142,
     1144,
     1146,
+    1147,
+    1153,
+    1154,
     1157,
     1160,
+    1161,
     1165,
     1166,
     1167,
     1168,
+    1169,
+    1170,
+    1172,
     1173,
+    1178,
+    1179,
     1180,
     1181,
+    1191,
     1192,
     1193,
+    1194,
     1195,
     1196,
     1197,
@@ -1436,8 +1469,12 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1212,
     1213,
     1214,
+    1215,
+    1216,
     1217,
     1218,
+    1248,
+    1255,
     1266,
     1276,
     1286,
@@ -1673,9 +1710,18 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1864,
     1865,
     1866,
-    1867
+    1867,
+    1906
   ],
   "Norway": [
+    48,
+    52,
+    64,
+    69,
+    80,
+    81,
+    120,
+    121,
     335,
     345,
     380,
@@ -1732,7 +1778,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     857,
     878,
     983,
-    1062
+    1017,
+    1018,
+    1062,
   ],
   "Finland": [
     661,
@@ -1746,7 +1794,11 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     893,
     920,
     925,
-    984
+    984,
+    995,
+    996,
+    1007,
+    1008
   ],
   "United Kingdom": [
     994,
@@ -1759,36 +1811,29 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1247
   ],
   "Estonia": [
-    995,
-    996
+    1074
   ],
   "Lithuania": [
-    1007,
-    1017,
-    1018
+    1190,
+    1248
   ],
   "Latvia": [
-    1008
+    1153
   ],
   "Denmark": [
     1060,
     1061
   ],
   "Ireland": [
-    1073,
     1077,
     1150,
-    1151,
-    1186,
-    1247
+    1186
   ],
   "Belarus": [
     1074,
-    1078,
-    1104
+    1078
   ],
   "China": [
-    1076,
     1147,
     1169,
     1170,
@@ -1827,12 +1872,14 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1455,
     1463,
     1464,
+    1465,
     1470,
     1471,
     1472,
     1483,
     1484,
     1485,
+    1486,
     1496,
     1497,
     1498,
@@ -1842,6 +1889,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1509,
     1517,
     1518,
+    1528,
     1535,
     1536,
     1537,
@@ -1859,7 +1907,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1586,
     1594,
     1595,
-    1596,
     1604,
     1616,
     1617,
@@ -1872,8 +1919,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1646,
     1647,
     1648,
-    1653,
-    1658,
     1660,
     1669,
     1670,
@@ -1918,11 +1963,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1940
   ],
   "Kazakhstan": [
-    1083,
-    1100,
-    1119,
-    1126,
-    1141,
     1156,
     1172,
     1178,
@@ -1985,14 +2025,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1107
   ],
   "Ukraine": [
-    1153,
-    1154,
     1155,
-    1191,
     1230,
     1240,
-    1248,
-    1255,
     1274,
     1282,
     1318,
@@ -2060,7 +2095,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1477,
     1488,
     1544,
-    1564
+    1563,
+    1564,
   ],
   "Romania": [
     1293,
@@ -2084,7 +2120,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1532,
     1591,
     1598,
-    1650
+    1650,
+    1655,
   ],
   "Croatia": [
     1356,
@@ -2123,8 +2160,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1583
   ],
   "North Korea": [
-    1428,
-    1486
+    1596,
+    1653
   ],
   "Azerbaijan": [
     1433,
@@ -2144,7 +2181,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1559,
     1579,
     1600,
-    1621
+    1621,
+    1651,
   ],
   "North Macedonia": [
     1444,
@@ -2161,7 +2199,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1578,
     1599,
     1609,
-    1656
+    1638,
+    1656,
   ],
   "Kyrgyzstan": [
     1481,
@@ -2236,8 +2275,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1758
   ],
   "Algeria": [
-    1563,
-    1638,
     1664,
     1673,
     1680,
@@ -2265,7 +2302,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1922,
     1928,
     1934,
-    1969
+    1969,
   ],
   "Afghanistan": [
     1566,
@@ -2285,7 +2322,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   ],
   "Cyprus": [
     1610,
-    1695
   ],
   "India": [
     1643,
@@ -2294,6 +2330,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1684,
     1736,
     1763,
+    1771,
+    1780,
     1781,
     1787,
     1795,
@@ -2331,10 +2369,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2087,
     2093,
     2100,
-    2106
+    2106,
   ],
   "Egypt": [
-    1651,
     1703,
     1720,
     1727,
@@ -2349,16 +2386,14 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1902,
     1903,
     1909,
-    1936
+    1936,
   ],
   "Morocco": [
-    1655,
     1710,
     1719,
     1790,
     1828,
     1900,
-    1968
   ],
   "Saudi Arabia": [
     1665,
@@ -2461,15 +2496,16 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1785
   ],
   "Nepal": [
+    1730,
     1764,
-    1780
+    1765
   ],
   "Bhutan": [
-    1771
   ],
   "Western Sahara": [
-    1777,
-    1837
+    1849,
+    1889,
+    1901
   ],
   "Myanmar": [
     1796,
@@ -2499,6 +2535,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1844
   ],
   "Mauritania": [
+    1777,
+    1837,
     1849,
     1889,
     1901,
@@ -2506,11 +2544,12 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1943,
     1944,
     1952,
+    1968,
     1976,
     1977,
     1978,
     1979,
-    2007
+    2007,
   ],
   "Mali": [
     1850,
@@ -2701,6 +2740,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2114
   ],
   "Colombia": [
+    2077,
     2090,
     2159,
     2160,
@@ -2811,7 +2851,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2227,
     2231,
     2239,
-    2240,
     2243,
     2247,
     2248,
@@ -2823,13 +2862,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2263,
     2265,
     2274,
-    2275,
     2278,
     2284,
-    2285,
-    2293,
     2294,
-    2298,
     2305,
     2314,
     2317
@@ -2839,8 +2874,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2181
   ],
   "Brazil": [
-    2198,
-    2199,
     2236,
     2245,
     2251,
@@ -2977,7 +3010,9 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   ],
   "Ecuador": [
     2250,
-    2288
+    2280,
+    2288,
+    2290
   ],
   "Gabon": [
     2253,
@@ -3180,16 +3215,24 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   ],
   "Bolivia": [
     2382,
+    2394,
     2426,
+    2431,
     2435,
+    2465,
     2466,
     2472,
+    2483,
     2492,
     2495,
     2504,
     2511,
+    2525,
+    2528,
     2533,
-    2544
+    2544,
+    2556,
+    2563
   ],
   "Madagascar": [
     2391,
@@ -3346,7 +3389,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1610
   ],
   "Israel": [
-    1681
+    1681,
+    1695,
   ],
   "Palestine": [
     1681
@@ -3358,11 +3402,12 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2256
   ],
   "Guyana": [
+    2198,
     2199
   ],
   "South Korea": [
-    1486,
-    1528
+    1653,
+    1658
   ],
   "Costa Rica": [
     2142
@@ -3371,10 +3416,10 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2038
   ],
   "Saint Martin": [
-    2064
+    2006
   ],
   "Sint Maarten": [
-    2064
+    2006
   ],
   "Czechia": [
     1273
@@ -3393,7 +3438,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1494
   ],
   "Tunisia": [
-    1638
   ],
   "Djibouti": [
     2068
@@ -3411,16 +3455,16 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1379
   ],
   "Haiti": [
-    2039
+    2015
   ],
   "Dominican Republic": [
-    2039
+    2015
   ],
   "El Salvador": [
     2038
   ],
   "East Timor": [
-    2412
+    2255
   ],
   "Monaco": [
     1377
@@ -3462,7 +3506,12 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2142
   ],
   "Papua New Guinea": [
-    2331
+    2234,
+    2240,
+    2275,
+    2285,
+    2293,
+    2298
   ],
   "Gambia": [
     2070
@@ -3501,16 +3550,17 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2549
   ],
   "Curaçao": [
-    2064
+    2006
   ],
   "Aruba": [
-    2064
+    2006
   ],
   "The Bahamas": [
-    1836
+    1836,
+    1906
   ],
   "Turks and Caicos Islands": [
-    2039
+    2015
   ],
   "Taiwan": [
     1797
@@ -3519,10 +3569,10 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1303
   ],
   "Pitcairn Islands": [
-    2359
+    2683
   ],
   "French Polynesia": [
-    2004
+    2683
   ],
   "French Southern and Antarctic Lands": [
     2391
@@ -3531,55 +3581,55 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2391
   ],
   "Kiribati": [
-    2234
+    2456
   ],
   "Marshall Islands": [
-    2234
+    2456
   ],
   "Trinidad and Tobago": [
-    2170
+    2015
   ],
   "Grenada": [
-    2064
+    2006
   ],
   "Saint Vincent and the Grenadines": [
-    2064
+    2006
   ],
   "Barbados": [
-    2064
+    2006
   ],
   "Saint Lucia": [
-    2064
+    2006
   ],
   "Dominica": [
-    2064
+    2006
   ],
   "United States Minor Outlying Islands": [
     2006
   ],
   "Montserrat": [
-    2064
+    2006
   ],
   "Antigua and Barbuda": [
-    2064
+    2006
   ],
   "Saint Kitts and Nevis": [
-    2064
+    2006
   ],
   "United States Virgin Islands": [
-    2064
+    2006
   ],
   "Saint Barthelemy": [
-    2064
+    2006
   ],
   "Puerto Rico": [
-    2039
+    2015
   ],
   "Anguilla": [
-    2064
+    2006
   ],
   "British Virgin Islands": [
-    2064
+    2006
   ],
   "Jamaica": [
     2006
@@ -3639,19 +3689,19 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2595
   ],
   "Cook Islands": [
-    1967
+    2667
   ],
   "Tonga": [
-    1967
+    2667
   ],
   "Wallis and Futuna": [
-    1967
+    2667
   ],
   "Samoa": [
-    1967
+    2667
   ],
   "Solomon Islands": [
-    2293
+    2549
   ],
   "Tuvalu": [
     2453
@@ -3660,10 +3710,10 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2093
   ],
   "Nauru": [
-    2234
+    2456
   ],
   "Federated States of Micronesia": [
-    2240
+    2456
   ],
   "South Georgia and the Islands": [
     2693
@@ -3675,19 +3725,19 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2456
   ],
   "Niue": [
-    1967
+    2667
   ],
   "American Samoa": [
-    1967
+    2667
   ],
   "Palau": [
-    2226
+    2453
   ],
   "Guam": [
-    2227
+    2453
   ],
   "Northern Mariana Islands": [
-    2227
+    2453
   ],
   "Bahrain": [
     1785
