@@ -44,7 +44,7 @@ const App: React.FC = () => {
       const next = prev.includes(continent)
         ? prev.filter(name => name !== continent)
         : [...prev, continent];
-      if (next.length < CONTINENT_OPTIONS.length) setIsGlobalGreen(false);
+      setIsGlobalGreen(next.length === CONTINENT_OPTIONS.length);
       return next;
     });
   };
