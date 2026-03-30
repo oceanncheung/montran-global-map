@@ -9,6 +9,7 @@ const indexPath = path.join(distPath, 'index.html');
 
 const app = express();
 const port = Number(process.env.PORT) || 8080;
+const host = '0.0.0.0';
 
 app.use(express.static(distPath));
 
@@ -16,6 +17,6 @@ app.use((_req, res) => {
   res.sendFile(indexPath);
 });
 
-app.listen(port, () => {
-  console.log(`Montran Global Map server listening on port ${port}`);
+app.listen(port, host, () => {
+  console.log(`Montran Global Map server listening on http://${host}:${port}`);
 });
