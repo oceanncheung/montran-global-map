@@ -249,7 +249,7 @@ const VISUAL_REGION_RULES = [
         replace: [2456],
       },
       'Solomon Islands': {
-        replace: [2549],
+        replace: [2293],
       },
       'American Samoa': {
         replace: [2667],
@@ -326,11 +326,16 @@ const VISUAL_REGION_RULES = [
     },
   },
   {
-    name: 'China East Edge',
+    name: 'China and Russia Border',
     countries: {
-      // The far-east coastal tip reads as part of China's stylized outline.
+      // Keep the northern boundary row with China instead of sharing it with
+      // Russia, then close China's northeast edge before Russia begins.
+      Russia: {
+        remove: [1147, 1169, 1170],
+      },
       China: {
-        add: [1465],
+        add: [1428],
+        remove: [1465],
       },
     },
   },

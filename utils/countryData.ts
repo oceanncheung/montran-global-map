@@ -1439,7 +1439,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1142,
     1144,
     1146,
-    1147,
     1153,
     1154,
     1157,
@@ -1449,8 +1448,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1166,
     1167,
     1168,
-    1169,
-    1170,
     1172,
     1173,
     1178,
@@ -1863,6 +1860,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1411,
     1415,
     1416,
+    1428,
     1435,
     1436,
     1437,
@@ -1872,7 +1870,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1455,
     1463,
     1464,
-    1465,
     1470,
     1471,
     1472,
@@ -3701,7 +3698,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2667
   ],
   "Solomon Islands": [
-    2549
+    2293
   ],
   "Tuvalu": [
     2453
