@@ -288,7 +288,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                       type="text" 
                       placeholder="Search countries..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
-                      value={countrySearch}
                       onChange={(e) => setCountrySearch(e.target.value)}
                       onKeyDown={handleCountrySearchKeyDown}
                     />
