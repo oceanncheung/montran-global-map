@@ -109,9 +109,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [countrySearch, allCountryNames, selectedCountries]);
 
   const selectSearchedCountry = (name: string) => {
+    const input = countrySearchInputRef.current;
     addCountry(name);
     setCountrySearch('');
-    window.requestAnimationFrame(() => countrySearchInputRef.current?.focus());
+    if (input) input.value = '';
+    window.requestAnimationFrame(() => {
+      if (!input) return;
+      input.value = '';
+      input.focus();
+    });
   };
 
   const handleCountrySearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
