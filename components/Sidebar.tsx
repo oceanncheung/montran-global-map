@@ -13,6 +13,8 @@ interface SidebarProps {
   toggleAllOffices: () => void;
   selectedCountries: string[];
   selectedContinents: ContinentName[];
+  showCountryLabels: boolean;
+  onToggleCountryLabels: () => void;
   addCountry: (name: string) => void;
   removeCountry: (name: string) => void;
   toggleContinent: (name: ContinentName) => void;
@@ -30,6 +32,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   toggleAllOffices,
   selectedCountries,
   selectedContinents,
+  showCountryLabels,
+  onToggleCountryLabels,
   addCountry,
   removeCountry,
   toggleContinent,
@@ -39,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [countrySearch, setCountrySearch] = useState('');
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Corporate HQ']);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const countrySearchInputRef = useRef<HTMLInputElement>(null);
 
   const groupedOffices = useMemo<Record<string, MontranOffice[]>>(() => {
     const categories = ['Corporate HQ', 'Americas', 'Europe', 'MENA', 'Africa', 'APAC'];
@@ -102,6 +107,23 @@ const Sidebar: React.FC<SidebarProps> = ({
       )
       .slice(0, 8);
   }, [countrySearch, allCountryNames, selectedCountries]);
+
+  const selectSearchedCountry = (name: string) => {
+    addCountry(name);
+    setCountrySearch('');
+    window.requestAnimationFrame(() => countrySearchInputRef.current?.focus());
+  };
+
+  const handleCountrySearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedSearch = countrySearch.trim().toLowerCase();
+    const countryToSelect = filteredCountries.find(
+      name => name.toLowerCase() === normalizedSearch
+    ) ?? filteredCountries[0];
+
+    if (!countryToSelect) return;
+    selectSearchedCountry(countryToSelect);
+  };
 
   return (
     <div 
@@ -220,12 +242,40 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-left">
               <div className="space-y-8">
                 <div className="space-y-6">
-                  <p className="text-display-9 tracking-tight text-slate-600 border-b-2 border-slate-100 py-4">
-                    By Country
-                  </p>
+                  <div className="flex items-center justify-between border-b-2 border-slate-100 py-4">
+                    <p className="text-display-9 tracking-tight text-slate-600">
+                      By Country
+                    </p>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={showCountryLabels}
+                      aria-label="Show country labels"
+                      onClick={onToggleCountryLabels}
+                      className="group flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-[#009681]/10"
+                    >
+                      <span className={`text-[14px] font-normal transition-colors ${showCountryLabels ? 'text-slate-600' : 'text-slate-400'}`}>
+                        Labels
+                      </span>
+                      <span
+                        className={`relative block h-6 w-10 flex-shrink-0 rounded-full border transition-colors duration-200 ${
+                          showCountryLabels
+                            ? 'border-[#009681] bg-[#009681]'
+                            : 'border-slate-200 bg-slate-100 group-hover:border-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute left-[3px] top-[3px] block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            showCountryLabels ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </span>
+                    </button>
+                  </div>
 
-                  <div className="relative">
+                  <form className="relative" onSubmit={handleCountrySearchSubmit}>
                     <input 
+                      ref={countrySearchInputRef}
                       type="text" 
                       placeholder="Search countries..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
@@ -237,10 +287,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         {filteredCountries.map(name => (
                           <div 
                             key={name}
-                            onClick={() => {
-                              addCountry(name);
-                              setCountrySearch('');
-                            }}
+                            onClick={() => selectSearchedCountry(name)}
                             className="px-5 py-4 text-display-9 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 text-slate-700"
                           >
                             {name}
@@ -248,7 +295,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ))}
                       </div>
                     )}
-                  </div>
+                  </form>
 
                   <div className="flex flex-wrap gap-2">
                     {selectedCountries.map(name => (

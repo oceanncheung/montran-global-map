@@ -72,7 +72,7 @@ export const COUNTRY_NAMES: string[] = [
   "Djibouti",
   "Dominica",
   "Dominican Republic",
-  "East Timor",
+  "Timor-Leste",
   "Ecuador",
   "Egypt",
   "El Salvador",
@@ -300,7 +300,7 @@ export const REPRESENTATIVE_DOT_COUNTRIES: string[] = [
   "Djibouti",
   "Dominica",
   "Dominican Republic",
-  "East Timor",
+  "Timor-Leste",
   "El Salvador",
   "eSwatini",
   "Falkland Islands",
@@ -3460,7 +3460,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   "El Salvador": [
     2038
   ],
-  "East Timor": [
+  "Timor-Leste": [
     2255
   ],
   "Monaco": [

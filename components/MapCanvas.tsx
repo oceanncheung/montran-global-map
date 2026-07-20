@@ -1,14 +1,22 @@
 
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { geoToPixel } from '../utils/geo';
 import { OfficeLocation } from '../types';
 import { MAP_DOTS, MONTRAN_OFFICES } from '../constants';
 import { MANUAL_MAPPINGS } from '../utils/mappings';
+import {
+  COUNTRY_LABEL_FONT_SIZE,
+  CountryLabelPlacementBounds,
+  createCountryLabelComposition,
+  createRoundedOrthogonalPath,
+} from '../utils/countryLabels';
 
 interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
+  labelCountries: string[];
+  showCountryLabels: boolean;
   isSidebarOpen: boolean;
   isGlobalGreen: boolean;
   onToggleGlobalGreen: (on: boolean) => void;
@@ -26,6 +34,9 @@ const SIDEBAR_GAP = 24;
 const CONTENT_PADDING = 120;
 const TOP_CLEARANCE = 120;
 const BOTTOM_CLEARANCE = 72;
+const LABEL_VIEWPORT_PADDING = 16;
+const LABEL_VIEWPORT_TOP = 112;
+const LABEL_VIEWPORT_BOTTOM = 88;
 
 const DEFAULT_VIEW_FRAME = {
   open: {
@@ -45,6 +56,8 @@ const DEFAULT_VIEW_FRAME = {
 const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
+  labelCountries,
+  showCountryLabels,
   isSidebarOpen,
   isGlobalGreen,
   onToggleGlobalGreen,
@@ -52,12 +65,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const currentTransformRef = useRef<d3.ZoomTransform | null>(null);
   const defaultTransformRef = useRef<d3.ZoomTransform | null>(null);
   const hasInitializedDefaultRef = useRef(false);
+  const isOverflowingRef = useRef(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
-  const [defaultScale, setDefaultScale] = useState(1);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
   // Derived set of indices to highlight based on sidebar selection
   const activeDotIndices = useMemo(() => {
@@ -120,7 +135,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const getDefaultTransform = (width: number, height: number) => {
-    const frame = isSidebarOpen ? DEFAULT_VIEW_FRAME.open : DEFAULT_VIEW_FRAME.closed;
+    const hasDockedSidebar = isSidebarOpen && width >= 728;
+    const frame = hasDockedSidebar ? DEFAULT_VIEW_FRAME.open : DEFAULT_VIEW_FRAME.closed;
     const availableWidth = Math.max(width - frame.left - frame.right, 240);
     const availableHeight = Math.max(height - frame.top - frame.bottom, 240);
     const fittedScale = Math.min(availableWidth / MAP_FIT_WIDTH, availableHeight / MAP_FIT_HEIGHT);
@@ -129,6 +145,72 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
     return d3.zoomIdentity.translate(tx, ty).scale(fittedScale);
   };
+
+  const getLabelPlacementBounds = (
+    width: number,
+    height: number,
+    transform: d3.ZoomTransform,
+  ): CountryLabelPlacementBounds => {
+    const hasDockedSidebar = isSidebarOpen && width >= 728;
+    const screenLeft = hasDockedSidebar
+      ? SIDEBAR_MARGIN + SIDEBAR_WIDTH + SIDEBAR_GAP / 2
+      : LABEL_VIEWPORT_PADDING;
+
+    return {
+      left: screenLeft - transform.x,
+      right: width - LABEL_VIEWPORT_PADDING - transform.x,
+      top: LABEL_VIEWPORT_TOP - transform.y,
+      bottom: height - LABEL_VIEWPORT_BOTTOM - transform.y,
+    };
+  };
+
+  const baseDefaultTransform = useMemo(() => {
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) return d3.zoomIdentity;
+    return getDefaultTransform(viewportSize.width, viewportSize.height);
+  }, [viewportSize.width, viewportSize.height, isSidebarOpen]);
+
+  const baseLabelPlacementBounds = useMemo<CountryLabelPlacementBounds | null>(() => {
+    if (viewportSize.width <= 0 || viewportSize.height <= 0) return null;
+    return getLabelPlacementBounds(
+      viewportSize.width,
+      viewportSize.height,
+      baseDefaultTransform,
+    );
+  }, [viewportSize.width, viewportSize.height, baseDefaultTransform, isSidebarOpen]);
+
+  const countryLabelComposition = useMemo(() => createCountryLabelComposition(
+    showCountryLabels ? labelCountries : [],
+    MANUAL_MAPPINGS,
+    MAP_DOTS,
+    {
+      placementScale: baseDefaultTransform.k,
+      placementBounds: baseLabelPlacementBounds,
+      viewportHeight: Math.max(viewportSize.height, 1),
+    },
+  ), [
+    showCountryLabels,
+    labelCountries,
+    baseDefaultTransform.k,
+    baseLabelPlacementBounds,
+    viewportSize.height,
+  ]);
+
+  const artboardHeight = Math.max(viewportSize.height, countryLabelComposition.artboardHeight);
+  const isOverflowing = artboardHeight > viewportSize.height + 0.5;
+  const defaultScale = Math.max(baseDefaultTransform.k, 0.01);
+  const defaultTransform = useMemo(() => d3.zoomIdentity
+    .translate(
+      baseDefaultTransform.x,
+      baseDefaultTransform.y + countryLabelComposition.verticalShift,
+    )
+    .scale(baseDefaultTransform.k), [
+      baseDefaultTransform.x,
+      baseDefaultTransform.y,
+      baseDefaultTransform.k,
+      countryLabelComposition.verticalShift,
+    ]);
+  const countryLabelLayouts = countryLabelComposition.labels;
+  isOverflowingRef.current = isOverflowing;
 
   const applyTransform = (
     selection: d3.Selection<SVGSVGElement, unknown, null, undefined>,
@@ -150,13 +232,36 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     selection.call(zoomRef.current.transform, transform);
   };
 
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateViewportSize = () => {
+      if (!containerRef.current) return;
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      setViewportSize((current) => (
+        Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5
+          ? current
+          : { width, height }
+      ));
+    };
+
+    updateViewportSize();
+    const observer = new ResizeObserver(updateViewportSize);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
     const svg = d3.select(svgRef.current);
-    const g = svg.select('g');
+    const g = svg.select<SVGGElement>('[data-map-world]');
     
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.4, 15])
+      .scaleExtent([0.05, 15])
+      .filter((event) => {
+        const passesDefaultFilter = (!event.ctrlKey || event.type === 'wheel') && !event.button;
+        return passesDefaultFilter && !(isOverflowingRef.current && event.type === 'wheel');
+      })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
         currentTransformRef.current = event.transform;
@@ -168,38 +273,36 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || !zoomRef.current) return;
+    if (
+      !svgRef.current ||
+      !zoomRef.current ||
+      viewportSize.width <= 0 ||
+      viewportSize.height <= 0
+    ) return;
+
     const svg = d3.select(svgRef.current);
+    const isAtDefault =
+      !currentTransformRef.current ||
+      transformsMatch(currentTransformRef.current, defaultTransformRef.current);
+    const shouldAnimate = hasInitializedDefaultRef.current && isAtDefault;
 
-    const computeDefault = () => {
-      const { width, height } = containerRef.current!.getBoundingClientRect();
-      return getDefaultTransform(width, height);
-    };
-
-    const nextDefault = computeDefault();
-    defaultTransformRef.current = nextDefault;
-    setDefaultScale(nextDefault.k);
-    applyTransform(svg, nextDefault, hasInitializedDefaultRef.current, 500);
+    defaultTransformRef.current = defaultTransform;
+    if (!hasInitializedDefaultRef.current || isAtDefault) {
+      applyTransform(svg, defaultTransform, shouldAnimate, shouldAnimate ? 500 : 0);
+    }
     hasInitializedDefaultRef.current = true;
+  }, [
+    defaultTransform.x,
+    defaultTransform.y,
+    defaultTransform.k,
+    viewportSize.width,
+    viewportSize.height,
+  ]);
 
-    const handleResize = () => {
-      if (!containerRef.current || !zoomRef.current) return;
-      const resizedDefault = computeDefault();
-      const isAtDefault =
-        !currentTransformRef.current ||
-        transformsMatch(currentTransformRef.current, defaultTransformRef.current);
-
-      defaultTransformRef.current = resizedDefault;
-      setDefaultScale(resizedDefault.k);
-
-      if (isAtDefault) {
-        applyTransform(svg, resizedDefault, false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isSidebarOpen]);
+  useEffect(() => {
+    if (!scrollAreaRef.current) return;
+    scrollAreaRef.current.scrollTop = Math.max(0, (artboardHeight - viewportSize.height) / 2);
+  }, [artboardHeight, viewportSize.height]);
 
   const handleZoomIn = () => {
     if (svgRef.current && zoomRef.current) {
@@ -214,27 +317,28 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const handleResetZoom = () => {
-    if (svgRef.current && zoomRef.current && containerRef.current) {
-      const { width, height } = containerRef.current.getBoundingClientRect();
-      const resetTransform = getDefaultTransform(width, height);
-
-      defaultTransformRef.current = resetTransform;
-      setDefaultScale(resetTransform.k);
-
-      applyTransform(d3.select(svgRef.current), resetTransform, true, 750);
+    if (svgRef.current && zoomRef.current) {
+      defaultTransformRef.current = defaultTransform;
+      applyTransform(d3.select(svgRef.current), defaultTransform, true, 750);
     }
   };
 
   const getCleanSVGClone = () => {
     if (!svgRef.current) return null;
     const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
-    const innerGroup = clone.querySelector('g');
+    const innerGroup = clone.querySelector<SVGGElement>('[data-map-world]');
     if (innerGroup) {
       innerGroup.removeAttribute('transform');
     }
-    clone.setAttribute('width', '2690');
-    clone.setAttribute('height', '1460');
-    clone.setAttribute('viewBox', '30 20 2690 1460');
+    clone.querySelectorAll<SVGGElement>('[data-export-transform]').forEach((label) => {
+      const exportTransform = label.getAttribute('data-export-transform');
+      if (exportTransform) label.setAttribute('transform', exportTransform);
+    });
+    const { x, y, width, height } = countryLabelComposition.exportViewBox;
+    clone.removeAttribute('style');
+    clone.setAttribute('width', String(width));
+    clone.setAttribute('height', String(height));
+    clone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
     return clone;
   };
 
@@ -262,8 +366,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     const url = URL.createObjectURL(svgBlob);
 
     img.onload = () => {
-      const baseWidth = 2690;
-      const baseHeight = 1460;
+      const baseWidth = countryLabelComposition.exportViewBox.width;
+      const baseHeight = countryLabelComposition.exportViewBox.height;
       canvas.width = baseWidth * scale;
       canvas.height = baseHeight * scale;
       
@@ -282,7 +386,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="flex-1 relative bg-white overflow-hidden flex items-center justify-center">
+    <div ref={containerRef} className="flex-1 relative bg-white overflow-hidden">
       {/* Header UI */}
       <div className="absolute top-6 right-6 z-40">
         <div className="relative">
@@ -362,9 +466,20 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       </div>
       </div>
 
+      <div
+        ref={scrollAreaRef}
+        className={`absolute inset-0 z-0 overflow-x-hidden ${
+          isOverflowing ? 'overflow-y-auto overscroll-contain' : 'overflow-y-hidden'
+        }`}
+        data-map-scroll-area
+      >
       <svg
         ref={svgRef}
-        className="w-full h-full map-container"
+        className="w-full map-container block"
+        style={{ height: `${Math.max(artboardHeight, 1)}px` }}
+        data-artboard-height={artboardHeight}
+        data-export-width={countryLabelComposition.exportViewBox.width}
+        data-export-height={countryLabelComposition.exportViewBox.height}
       >
         <defs>
           <filter id="office-glow" x="-100%" y="-100%" width="300%" height="300%">
@@ -388,8 +503,37 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <filter id="country-label-shadow" x="-30%" y="-60%" width="160%" height="220%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.14" />
+          </filter>
         </defs>
-        <g>
+        <g data-map-world>
+          <g id="country-label-leaders" pointerEvents="none" aria-hidden="true">
+            {countryLabelLayouts.map((label) => {
+              if (!label.leaderPoints) return null;
+              const baseLabelScale = 1 / defaultScale;
+              const labelTransform = `translate(${label.anchor.x} ${label.anchor.y}) scale(${baseLabelScale})`;
+
+              return (
+                <g
+                  key={`leader-${label.name}`}
+                  data-country-leader={label.name}
+                  data-export-transform={labelTransform}
+                  transform={labelTransform}
+                >
+                  <path
+                    d={createRoundedOrthogonalPath(label.leaderPoints)}
+                    fill="none"
+                    stroke="#009681"
+                    strokeWidth="1.25"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.5"
+                  />
+                </g>
+              );
+            })}
+          </g>
           <g id="grid-dots">
             {MAP_DOTS.map((dot, i) => {
               const isActive = isGlobalGreen || activeDotIndices.has(i);
@@ -404,6 +548,62 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   className="grid-dot"
                   style={{ transition: 'fill 150ms ease, opacity 150ms ease' }}
                 />
+              );
+            })}
+          </g>
+          <g id="country-labels" pointerEvents="none" aria-hidden="true">
+            {countryLabelLayouts.map((label, index) => {
+              const baseLabelScale = 1 / defaultScale;
+              const anchorTransform = `translate(${label.anchor.x} ${label.anchor.y})`;
+              const labelTransform = `${anchorTransform} scale(${baseLabelScale})`;
+              const mirrorPill = label.side === 'left';
+
+              return (
+                <g
+                  key={label.name}
+                  className="country-label"
+                  data-country-label={label.name}
+                  data-label-placement={label.placement}
+                  data-label-side={label.side}
+                  data-label-rail-index={label.railIndex}
+                  data-export-transform={labelTransform}
+                  transform={labelTransform}
+                  style={{ animationDelay: `${Math.min(index * 35, 210)}ms` }}
+                >
+                  <g transform={`translate(${label.offset.x} ${label.offset.y})`}>
+                    <rect
+                      x={-label.width / 2}
+                      y={-label.height / 2}
+                      width={label.width}
+                      height={label.height}
+                      rx={label.height / 2}
+                      fill="#ffffff"
+                      stroke="#009681"
+                      strokeWidth="1.15"
+                      strokeOpacity="0.48"
+                      filter="url(#country-label-shadow)"
+                    />
+                    <circle
+                      cx={mirrorPill ? label.width / 2 - 13 : -label.width / 2 + 13}
+                      cy="0"
+                      r="3.5"
+                      fill="#009681"
+                    />
+                    <text
+                      x={mirrorPill ? label.width / 2 - 25 : -label.width / 2 + 25}
+                      y="0.5"
+                      fill="#24423d"
+                      fontFamily="Source Sans 3, sans-serif"
+                      fontSize={COUNTRY_LABEL_FONT_SIZE}
+                      fontWeight="400"
+                      letterSpacing="0"
+                      dominantBaseline="middle"
+                      textAnchor={mirrorPill ? 'end' : 'start'}
+                    >
+                      {label.name}
+                    </text>
+                  </g>
+                </g>
               );
             })}
           </g>
@@ -434,6 +634,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           </g>
         </g>
       </svg>
+      </div>
     </div>
   );
 };

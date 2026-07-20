@@ -1,0 +1,105 @@
+@tailwind base;
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('/fonts/source-sans-3-light.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/source-sans-3-regular.ttf') format('truetype');
+}
+
+@layer base {
+  :root {
+    font-size: 16px;
+  }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 300;
+    overflow: hidden;
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  select,
+  a {
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 300;
+  }
+}
+
+@tailwind components;
+
+@layer components {
+  .text-display-1 { font-size: 190px; line-height: 1.1; font-weight: 300; }
+  .text-display-2 { font-size: 142px; line-height: 1.1; font-weight: 300; }
+  .text-display-3 { font-size: 114px; line-height: 1.1; font-weight: 300; }
+  .text-display-4 { font-size: 92px; line-height: 1.1; font-weight: 300; }
+  .text-display-5 { font-size: 78px; line-height: 1.1; font-weight: 300; }
+  .text-display-6 { font-size: 63px; line-height: 1.1; font-weight: 300; }
+  .text-display-7 { font-size: 52px; line-height: 1.1; font-weight: 300; }
+  .text-display-8 { font-size: 32px; line-height: 1.2; font-weight: 300; }
+  .text-display-9 { font-size: 21px; line-height: 1.4; font-weight: 300; }
+}
+
+@tailwind utilities;
+
+@layer utilities {
+  .map-container {
+    cursor: grab;
+    background: #ffffff;
+  }
+
+  .map-container:active {
+    cursor: grabbing;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .grid-dot {
+    transition: fill 0.3s ease, opacity 0.3s ease;
+  }
+
+  .country-label {
+    animation: country-label-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes country-label-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .country-label {
+    animation: none;
+  }
+}

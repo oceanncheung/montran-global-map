@@ -282,7 +282,7 @@ const VISUAL_REGION_RULES = [
     countries: {
       // On this stylized map, Australia should stay visually pure and the
       // islands north of it should carry the Asia/Oceania mental map. Keep
-      // East Timor on the Indonesia chain and move Papua New Guinea onto the
+      // Timor-Leste on the Indonesia chain and move Papua New Guinea onto the
       // far-right island cluster instead of borrowing Australia mainland dots.
       Indonesia: {
         remove: [2234, 2240, 2275, 2285, 2293, 2298],
@@ -290,7 +290,7 @@ const VISUAL_REGION_RULES = [
       'Papua New Guinea': {
         replace: [2234, 2240, 2275, 2285, 2293, 2298],
       },
-      'East Timor': {
+      'Timor-Leste': {
         replace: [2255],
       },
     },
@@ -448,11 +448,19 @@ const DOT_SAMPLE_OFFSETS = [
 
 const DOT_COMPLETION_DISTANCE_LIMIT = 90;
 
-const getCountryName = (feature) =>
-  feature?.properties?.ADMIN ||
-  feature?.properties?.name ||
-  feature?.properties?.NAME ||
-  null;
+const COUNTRY_NAME_ALIASES = {
+  'East Timor': 'Timor-Leste',
+};
+
+const getCountryName = (feature) => {
+  const sourceName =
+    feature?.properties?.ADMIN ||
+    feature?.properties?.name ||
+    feature?.properties?.NAME ||
+    null;
+
+  return COUNTRY_NAME_ALIASES[sourceName] ?? sourceName;
+};
 
 const isLongitudeInBounds = (lng, minLng, maxLng) => {
   if (minLng <= maxLng) {

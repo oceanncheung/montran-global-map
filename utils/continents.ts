@@ -203,7 +203,7 @@ const CONTINENT_COUNTRY_SOURCE = {
     'Cyprus',
     'Cyprus No Mans Area',
     'Dhekelia Sovereign Base Area',
-    'East Timor',
+    'Timor-Leste',
     'Georgia',
     'Hong Kong S.A.R.',
     'India',
@@ -291,5 +291,6 @@ export const CONTINENT_COUNTRY_MAP: Record<ContinentName, string[]> = CONTINENT_
 export const UNASSIGNED_CONTINENT_COUNTRIES = COUNTRY_NAMES.filter(
   (countryName) =>
     countryName !== 'Antarctica' &&
-    !Object.values(CONTINENT_COUNTRY_SOURCE).some((countries) => countries.includes(countryName)),
+    !(Object.values(CONTINENT_COUNTRY_SOURCE) as readonly (readonly string[])[])
+      .some((countries) => countries.includes(countryName)),
 );

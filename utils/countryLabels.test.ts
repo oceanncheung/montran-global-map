@@ -1,0 +1,347 @@
+import { describe, expect, it } from 'vitest';
+import { MAP_DOTS } from '../constants';
+import { MapPoint } from '../types';
+import { COUNTRY_NAMES, MANUAL_MAPPINGS } from './mappings';
+import {
+  CountryLabelCompositionOptions,
+  CountryLabelLayout,
+  CountryLabelRect,
+  countryLabelRectsOverlap,
+  createCountryLabelComposition,
+  createRoundedOrthogonalPath,
+} from './countryLabels';
+
+const EXACT_COUNTRIES = [
+  'Fiji',
+  'India',
+  'Maldives',
+  'Mongolia',
+  'Nepal',
+  'Papua New Guinea',
+  'Philippines',
+  'Sri Lanka',
+  'Samoa',
+  'Solomon Islands',
+  'Timor-Leste',
+  'Vanuatu',
+  'Bangladesh',
+];
+
+const MAP_CONTENT_CENTER_X = (83 + 2668) / 2;
+const MAP_CONTENT_CENTER_Y = (71 + 1430) / 2;
+const MAP_FIT_WIDTH = 2668 - 83 + 160;
+const MAP_FIT_HEIGHT = 1430 - 71 + 160;
+
+const getOptions = (
+  width = 1440,
+  height = 900,
+  sidebarOpen = true,
+): CountryLabelCompositionOptions => {
+  const hasDockedSidebar = sidebarOpen && width >= 728;
+  const frame = hasDockedSidebar
+    ? { left: 408, right: 120, top: 120, bottom: 72 }
+    : { left: 120, right: 120, top: 120, bottom: 72 };
+  const availableWidth = Math.max(width - frame.left - frame.right, 240);
+  const availableHeight = Math.max(height - frame.top - frame.bottom, 240);
+  const placementScale = Math.min(
+    availableWidth / MAP_FIT_WIDTH,
+    availableHeight / MAP_FIT_HEIGHT,
+  );
+  const tx = frame.left + availableWidth / 2 - MAP_CONTENT_CENTER_X * placementScale;
+  const ty = frame.top + availableHeight / 2 - MAP_CONTENT_CENTER_Y * placementScale;
+  const screenLeft = hasDockedSidebar ? 396 : 16;
+
+  return {
+    placementScale,
+    viewportHeight: height,
+    placementBounds: {
+      left: screenLeft - tx,
+      right: width - 16 - tx,
+      top: 112 - ty,
+      bottom: height - 88 - ty,
+    },
+  };
+};
+
+const expectNoPillOverlaps = (labels: CountryLabelLayout[]) => {
+  for (let first = 0; first < labels.length; first += 1) {
+    for (let second = first + 1; second < labels.length; second += 1) {
+      expect(
+        countryLabelRectsOverlap(labels[first].rect, labels[second].rect),
+        `${labels[first].name} overlaps ${labels[second].name}`,
+      ).toBe(false);
+    }
+  }
+};
+
+const expectAxisAlignedRoutes = (labels: CountryLabelLayout[]) => {
+  labels.forEach((label) => {
+    if (!label.leaderPoints) return;
+    for (let index = 1; index < label.leaderPoints.length; index += 1) {
+      const previous = label.leaderPoints[index - 1];
+      const current = label.leaderPoints[index];
+      expect(
+        Math.abs(previous.x - current.x) < 0.001 ||
+        Math.abs(previous.y - current.y) < 0.001,
+        `${label.name} has a diagonal route segment`,
+      ).toBe(true);
+    }
+  });
+};
+
+const segmentIntersectsRect = (start: MapPoint, end: MapPoint, rect: CountryLabelRect) => {
+  if (Math.abs(start.y - end.y) < 0.001) {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    return start.y > rect.top && start.y < rect.bottom && maxX > rect.left && minX < rect.right;
+  }
+
+  const minY = Math.min(start.y, end.y);
+  const maxY = Math.max(start.y, end.y);
+  return start.x > rect.left && start.x < rect.right && maxY > rect.top && minY < rect.bottom;
+};
+
+const getAbsoluteLeaderPoints = (label: CountryLabelLayout, scale: number) => (
+  (label.leaderPoints ?? []).map((point) => ({
+    x: label.anchor.x * scale + point.x,
+    y: label.anchor.y * scale + point.y,
+  }))
+);
+
+const expectLeadersAvoidPills = (labels: CountryLabelLayout[], scale: number) => {
+  labels.forEach((label) => {
+    const points = getAbsoluteLeaderPoints(label, scale);
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      labels.forEach((otherLabel) => {
+        if (otherLabel.name === label.name) return;
+        expect(
+          segmentIntersectsRect(points[pointIndex - 1], points[pointIndex], otherLabel.rect),
+          `${label.name} leader crosses ${otherLabel.name}`,
+        ).toBe(false);
+      });
+    }
+  });
+};
+
+const segmentsIntersect = (
+  firstStart: MapPoint,
+  firstEnd: MapPoint,
+  secondStart: MapPoint,
+  secondEnd: MapPoint,
+) => {
+  const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) < 0.001;
+  const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) < 0.001;
+  if (firstHorizontal === secondHorizontal) return false;
+
+  const horizontalStart = firstHorizontal ? firstStart : secondStart;
+  const horizontalEnd = firstHorizontal ? firstEnd : secondEnd;
+  const verticalStart = firstHorizontal ? secondStart : firstStart;
+  const verticalEnd = firstHorizontal ? secondEnd : firstEnd;
+  const intersectionX = verticalStart.x;
+  const intersectionY = horizontalStart.y;
+  return (
+    intersectionX > Math.min(horizontalStart.x, horizontalEnd.x) &&
+    intersectionX < Math.max(horizontalStart.x, horizontalEnd.x) &&
+    intersectionY > Math.min(verticalStart.y, verticalEnd.y) &&
+    intersectionY < Math.max(verticalStart.y, verticalEnd.y)
+  );
+};
+
+const expectNoLeaderCrossings = (labels: CountryLabelLayout[], scale: number) => {
+  const leaders = labels
+    .filter((label) => label.leaderPoints)
+    .map((label) => ({ label, points: getAbsoluteLeaderPoints(label, scale) }));
+
+  for (let first = 0; first < leaders.length; first += 1) {
+    for (let second = first + 1; second < leaders.length; second += 1) {
+      for (let firstSegment = 1; firstSegment < leaders[first].points.length; firstSegment += 1) {
+        for (let secondSegment = 1; secondSegment < leaders[second].points.length; secondSegment += 1) {
+          expect(
+            segmentsIntersect(
+              leaders[first].points[firstSegment - 1],
+              leaders[first].points[firstSegment],
+              leaders[second].points[secondSegment - 1],
+              leaders[second].points[secondSegment],
+            ),
+            `${leaders[first].label.name} leader crosses ${leaders[second].label.name}`,
+          ).toBe(false);
+        }
+      }
+    }
+  }
+};
+
+const expectLabelsWithinBounds = (
+  labels: CountryLabelLayout[],
+  options: CountryLabelCompositionOptions,
+  verticalShift = 0,
+) => {
+  const bounds = options.placementBounds;
+  expect(bounds).toBeTruthy();
+  if (!bounds) return;
+
+  labels.forEach((label) => {
+    expect(label.rect.left, `${label.name} is clipped on the left`).toBeGreaterThanOrEqual(bounds.left);
+    expect(label.rect.right, `${label.name} is clipped on the right`).toBeLessThanOrEqual(bounds.right);
+    expect(label.rect.top, `${label.name} is clipped at the top`).toBeGreaterThanOrEqual(bounds.top - verticalShift);
+    expect(label.rect.bottom, `${label.name} is clipped at the bottom`).toBeLessThanOrEqual(bounds.bottom + verticalShift);
+  });
+};
+
+describe('country label composition', () => {
+  it('returns the base artboard for an empty selection', () => {
+    const composition = createCountryLabelComposition([], MANUAL_MAPPINGS, MAP_DOTS, getOptions());
+    expect(composition.labels).toEqual([]);
+    expect(composition.artboardHeight).toBe(900);
+    expect(composition.exportViewBox).toEqual({ x: 30, y: 20, width: 2690, height: 1460 });
+  });
+
+  it('floats a single small country beside its mapped dot', () => {
+    const composition = createCountryLabelComposition(['Fiji'], MANUAL_MAPPINGS, MAP_DOTS, getOptions());
+    expect(composition.labels).toHaveLength(1);
+    expect(composition.labels[0].placement).toBe('floating');
+    expect(composition.labels[0].leaderPoints?.length).toBeGreaterThanOrEqual(2);
+    expectAxisAlignedRoutes(composition.labels);
+  });
+
+  it('places two nearby small countries without overlapping their pills', () => {
+    const options = getOptions();
+    const composition = createCountryLabelComposition(
+      ['Fiji', 'Vanuatu'],
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+    expect(composition.labels).toHaveLength(2);
+    expectNoPillOverlaps(composition.labels);
+    expectLeadersAvoidPills(composition.labels, options.placementScale);
+  });
+
+  it('keeps a sufficiently spacious country label inside its footprint', () => {
+    const composition = createCountryLabelComposition(
+      ['China'],
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      getOptions(),
+    );
+    expect(composition.labels).toHaveLength(1);
+    expect(composition.labels[0].placement).toBe('inside');
+    expect(composition.labels[0].leaderPoints).toBeUndefined();
+  });
+
+  it('lays out the supplied 13-country set without collisions', () => {
+    const options = getOptions();
+    const composition = createCountryLabelComposition(
+      EXACT_COUNTRIES,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+
+    expect(composition.labels.map((label) => label.name).sort()).toEqual([...EXACT_COUNTRIES].sort());
+    expect(composition.artboardHeight).toBe(900);
+    expect(composition.labels.filter((label) => label.placement === 'floating').length).toBeGreaterThan(
+      composition.labels.filter((label) => label.placement === 'rail').length,
+    );
+    expect(composition.labels.some((label) => label.placement === 'rail')).toBe(true);
+    expectNoPillOverlaps(composition.labels);
+    expectAxisAlignedRoutes(composition.labels);
+    expectLeadersAvoidPills(composition.labels, options.placementScale);
+    expectNoLeaderCrossings(composition.labels, options.placementScale);
+  });
+
+  it('is independent of country selection order', () => {
+    const options = getOptions();
+    const forward = createCountryLabelComposition(
+      EXACT_COUNTRIES,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+    const reverse = createCountryLabelComposition(
+      [...EXACT_COUNTRIES].reverse(),
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+    expect(reverse).toEqual(forward);
+  });
+
+  it.each([
+    [1440, 900, true],
+    [1440, 900, false],
+    [1280, 720, true],
+    [1280, 720, false],
+    [390, 844, true],
+    [390, 844, false],
+  ] as const)('keeps the supplied set valid at %ix%i with sidebar=%s', (width, height, sidebarOpen) => {
+    const options = getOptions(width, height, sidebarOpen);
+    const composition = createCountryLabelComposition(
+      EXACT_COUNTRIES,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+
+    expect(composition.labels).toHaveLength(EXACT_COUNTRIES.length);
+    expect(composition.exportViewBox).toEqual({ x: 30, y: 20, width: 2690, height: 1460 });
+    expectNoPillOverlaps(composition.labels);
+    expectAxisAlignedRoutes(composition.labels);
+    expectLeadersAvoidPills(composition.labels, options.placementScale);
+    expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
+  });
+
+  it('separates countries whose anchors are nearly coincident', () => {
+    const dots = [
+      { x: 100, y: 100 },
+      { x: 104, y: 101 },
+      { x: 108, y: 102 },
+      { x: 112, y: 103 },
+    ];
+    const mappings = { Alpha: [0], Beta: [1], Gamma: [2], Delta: [3] };
+    const composition = createCountryLabelComposition(
+      Object.keys(mappings),
+      mappings,
+      dots,
+      {
+        placementScale: 1,
+        viewportHeight: 280,
+        placementBounds: { left: 0, right: 400, top: 20, bottom: 260 },
+      },
+    );
+    expectNoPillOverlaps(composition.labels);
+    expectAxisAlignedRoutes(composition.labels);
+  });
+
+  it('extends the artboard instead of shrinking dense labels', () => {
+    const denseCountries = COUNTRY_NAMES
+      .filter((name) => (MANUAL_MAPPINGS[name]?.length ?? 0) > 0)
+      .slice(0, 80);
+    const options = getOptions();
+    const composition = createCountryLabelComposition(
+      denseCountries,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+
+    expect(composition.labels).toHaveLength(denseCountries.length);
+    expect(composition.artboardHeight).toBeGreaterThan(options.viewportHeight);
+    expect(composition.exportViewBox.height).toBeGreaterThan(1460);
+    expectNoPillOverlaps(composition.labels);
+    expectAxisAlignedRoutes(composition.labels);
+    expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
+  });
+
+  it('rounds orthogonal corners without introducing diagonal segments', () => {
+    const path = createRoundedOrthogonalPath([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 30 },
+      { x: 80, y: 30 },
+    ]);
+    expect(path).toContain('H');
+    expect(path).toContain('V');
+    expect(path.match(/ Q /g)).toHaveLength(2);
+  });
+});
