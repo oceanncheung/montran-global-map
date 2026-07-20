@@ -120,14 +120,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  const handleCountrySearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleCountrySearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+
     const normalizedSearch = countrySearch.trim().toLowerCase();
     const countryToSelect = filteredCountries.find(
       name => name.toLowerCase() === normalizedSearch
     ) ?? filteredCountries[0];
 
     if (!countryToSelect) return;
+
+    event.preventDefault();
     selectSearchedCountry(countryToSelect);
   };
 
@@ -279,7 +282,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   </div>
 
-                  <form className="relative" onSubmit={handleCountrySearchSubmit}>
+                  <div className="relative">
                     <input 
                       ref={countrySearchInputRef}
                       type="text" 
@@ -287,6 +290,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
                       value={countrySearch}
                       onChange={(e) => setCountrySearch(e.target.value)}
+                      onKeyDown={handleCountrySearchKeyDown}
                     />
                     {filteredCountries.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 overflow-hidden">
@@ -301,7 +305,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ))}
                       </div>
                     )}
-                  </form>
+                  </div>
 
                   <div className="flex flex-wrap gap-2">
                     {selectedCountries.map(name => (
