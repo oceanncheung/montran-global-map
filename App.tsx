@@ -11,21 +11,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.OFFICES);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([
-    'Fiji',
-    'India',
-    'Maldives',
-    'Mongolia',
-    'Nepal',
-    'Papua New Guinea',
-    'Philippines',
-    'Sri Lanka',
-    'Samoa',
-    'Solomon Islands',
-    'Timor-Leste',
-    'Vanuatu',
-    'Bangladesh',
-  ]);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [selectedContinents, setSelectedContinents] = useState<ContinentName[]>([]);
   const [isGlobalGreen, setIsGlobalGreen] = useState(false);
   const [showCountryLabels, setShowCountryLabels] = useState(true);

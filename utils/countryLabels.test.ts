@@ -3,6 +3,9 @@ import { MAP_DOTS } from '../constants';
 import { MapPoint } from '../types';
 import { COUNTRY_NAMES, MANUAL_MAPPINGS } from './mappings';
 import {
+  COUNTRY_LABEL_LEADER_CLEARANCE,
+  COUNTRY_LABEL_MIN_PILL_APPROACH,
+  COUNTRY_LABEL_ROUTE_SEPARATION,
   CountryLabelCompositionOptions,
   CountryLabelLayout,
   CountryLabelRect,
@@ -114,8 +117,14 @@ const expectLeadersAvoidPills = (labels: CountryLabelLayout[], scale: number) =>
     for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
       labels.forEach((otherLabel) => {
         if (otherLabel.name === label.name) return;
+        const rect = {
+          left: otherLabel.rect.left - COUNTRY_LABEL_LEADER_CLEARANCE,
+          right: otherLabel.rect.right + COUNTRY_LABEL_LEADER_CLEARANCE,
+          top: otherLabel.rect.top - COUNTRY_LABEL_LEADER_CLEARANCE,
+          bottom: otherLabel.rect.bottom + COUNTRY_LABEL_LEADER_CLEARANCE,
+        };
         expect(
-          segmentIntersectsRect(points[pointIndex - 1], points[pointIndex], otherLabel.rect),
+          segmentIntersectsRect(points[pointIndex - 1], points[pointIndex], rect),
           `${label.name} leader crosses ${otherLabel.name}`,
         ).toBe(false);
       });
@@ -123,7 +132,7 @@ const expectLeadersAvoidPills = (labels: CountryLabelLayout[], scale: number) =>
   });
 };
 
-const segmentsIntersect = (
+const segmentsOverlap = (
   firstStart: MapPoint,
   firstEnd: MapPoint,
   secondStart: MapPoint,
@@ -131,23 +140,28 @@ const segmentsIntersect = (
 ) => {
   const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) < 0.001;
   const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) < 0.001;
-  if (firstHorizontal === secondHorizontal) return false;
-
-  const horizontalStart = firstHorizontal ? firstStart : secondStart;
-  const horizontalEnd = firstHorizontal ? firstEnd : secondEnd;
-  const verticalStart = firstHorizontal ? secondStart : firstStart;
-  const verticalEnd = firstHorizontal ? secondEnd : firstEnd;
-  const intersectionX = verticalStart.x;
-  const intersectionY = horizontalStart.y;
-  return (
-    intersectionX > Math.min(horizontalStart.x, horizontalEnd.x) &&
-    intersectionX < Math.max(horizontalStart.x, horizontalEnd.x) &&
-    intersectionY > Math.min(verticalStart.y, verticalEnd.y) &&
-    intersectionY < Math.max(verticalStart.y, verticalEnd.y)
-  );
+  if (firstHorizontal !== secondHorizontal) return false;
+  if (firstHorizontal) {
+    if (Math.abs(firstStart.y - secondStart.y) > COUNTRY_LABEL_ROUTE_SEPARATION) return false;
+    return Math.min(
+      Math.max(firstStart.x, firstEnd.x),
+      Math.max(secondStart.x, secondEnd.x),
+    ) - Math.max(
+      Math.min(firstStart.x, firstEnd.x),
+      Math.min(secondStart.x, secondEnd.x),
+    ) > 0.5;
+  }
+  if (Math.abs(firstStart.x - secondStart.x) > COUNTRY_LABEL_ROUTE_SEPARATION) return false;
+  return Math.min(
+    Math.max(firstStart.y, firstEnd.y),
+    Math.max(secondStart.y, secondEnd.y),
+  ) - Math.max(
+    Math.min(firstStart.y, firstEnd.y),
+    Math.min(secondStart.y, secondEnd.y),
+  ) > 0.5;
 };
 
-const expectNoLeaderCrossings = (labels: CountryLabelLayout[], scale: number) => {
+const expectNoLeaderOverlaps = (labels: CountryLabelLayout[], scale: number) => {
   const leaders = labels
     .filter((label) => label.leaderPoints)
     .map((label) => ({ label, points: getAbsoluteLeaderPoints(label, scale) }));
@@ -157,18 +171,33 @@ const expectNoLeaderCrossings = (labels: CountryLabelLayout[], scale: number) =>
       for (let firstSegment = 1; firstSegment < leaders[first].points.length; firstSegment += 1) {
         for (let secondSegment = 1; secondSegment < leaders[second].points.length; secondSegment += 1) {
           expect(
-            segmentsIntersect(
+            segmentsOverlap(
               leaders[first].points[firstSegment - 1],
               leaders[first].points[firstSegment],
               leaders[second].points[secondSegment - 1],
               leaders[second].points[secondSegment],
             ),
-            `${leaders[first].label.name} leader crosses ${leaders[second].label.name}`,
+            `${leaders[first].label.name} leader overlaps ${leaders[second].label.name}`,
           ).toBe(false);
         }
       }
     }
   }
+};
+
+const expectBentRoutesHaveClearApproaches = (labels: CountryLabelLayout[], scale: number) => {
+  labels.forEach((label) => {
+    const points = getAbsoluteLeaderPoints(label, scale).filter((point, index, route) => (
+      index === 0 || Math.hypot(point.x - route[index - 1].x, point.y - route[index - 1].y) > 0.001
+    ));
+    if (points.length < 4) return;
+    const last = points[points.length - 1];
+    const beforeLast = points[points.length - 2];
+    expect(
+      Math.abs(last.x - beforeLast.x),
+      `${label.name} does not have enough horizontal space before its pill`,
+    ).toBeGreaterThanOrEqual(COUNTRY_LABEL_MIN_PILL_APPROACH - 0.001);
+  });
 };
 
 const expectLabelsWithinBounds = (
@@ -215,6 +244,7 @@ describe('country label composition', () => {
     expect(composition.labels).toHaveLength(2);
     expectNoPillOverlaps(composition.labels);
     expectLeadersAvoidPills(composition.labels, options.placementScale);
+    expectNoLeaderOverlaps(composition.labels, options.placementScale);
   });
 
   it('keeps a sufficiently spacious country label inside its footprint', () => {
@@ -247,7 +277,12 @@ describe('country label composition', () => {
     expectNoPillOverlaps(composition.labels);
     expectAxisAlignedRoutes(composition.labels);
     expectLeadersAvoidPills(composition.labels, options.placementScale);
-    expectNoLeaderCrossings(composition.labels, options.placementScale);
+    expectNoLeaderOverlaps(composition.labels, options.placementScale);
+    expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
+
+    const nepal = composition.labels.find((label) => label.name === 'Nepal');
+    expect(nepal).toBeTruthy();
+    expect(getAbsoluteLeaderPoints(nepal!, options.placementScale)).toHaveLength(2);
   });
 
   it('is independent of country selection order', () => {
@@ -288,6 +323,8 @@ describe('country label composition', () => {
     expectNoPillOverlaps(composition.labels);
     expectAxisAlignedRoutes(composition.labels);
     expectLeadersAvoidPills(composition.labels, options.placementScale);
+    expectNoLeaderOverlaps(composition.labels, options.placementScale);
+    expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
     expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
   });
 
@@ -330,6 +367,8 @@ describe('country label composition', () => {
     expect(composition.exportViewBox.height).toBeGreaterThan(1460);
     expectNoPillOverlaps(composition.labels);
     expectAxisAlignedRoutes(composition.labels);
+    expectNoLeaderOverlaps(composition.labels, options.placementScale);
+    expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
     expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
   });
 

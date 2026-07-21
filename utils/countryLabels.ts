@@ -5,6 +5,9 @@ export const COUNTRY_LABEL_FONT_SIZE = 16;
 export const COUNTRY_LABEL_ROW_GAP = 8;
 export const COUNTRY_LABEL_ROW_PITCH = COUNTRY_LABEL_HEIGHT + COUNTRY_LABEL_ROW_GAP;
 export const COUNTRY_LABEL_CORNER_RADIUS = 6;
+export const COUNTRY_LABEL_MIN_PILL_APPROACH = 18;
+export const COUNTRY_LABEL_LEADER_CLEARANCE = 5;
+export const COUNTRY_LABEL_ROUTE_SEPARATION = 2;
 
 export type CountryLabelPlacement = 'inside' | 'floating' | 'rail';
 export type CountryLabelSide = 'left' | 'right';
@@ -83,16 +86,23 @@ interface RailResult {
 const CONNECTED_DOT_DISTANCE = 34;
 const MIN_INSIDE_DOT_COUNT = 14;
 const INSIDE_PADDING = 30;
-const LABEL_COLLISION_PADDING = 6;
-const FLOATING_GAP = 12;
+const LABEL_COLLISION_PADDING = 8;
+const FLOATING_GAP = 20;
+const BENT_FLOATING_GAP = 40;
 const FLOATING_CLUSTER_WIDTH = 180;
 const FLOATING_CLUSTER_HEIGHT = 136;
-const MAX_FLOATING_PER_CLUSTER = 5;
+const MAX_FLOATING_PER_CLUSTER = 7;
 const DENSE_SELECTION_THRESHOLD = 28;
+const COMPACT_RAIL_SCALE_THRESHOLD = 0.15;
+const COMPACT_RAIL_LABEL_THRESHOLD = 8;
 const DOT_LEADER_GAP = 8;
-const RAIL_GUTTER = 24;
+const RAIL_GUTTER = 88;
 const ROUTING_LANE_GAP = 8;
-const ROUTING_END_GAP = 8;
+const ROUTING_VERTICAL_CLEARANCE = 4;
+const ROUTING_PORT_MIN_SEPARATION = COUNTRY_LABEL_ROUTE_SEPARATION + 1;
+const MIN_DOT_DEPARTURE = 12;
+const STRAIGHT_ALIGNMENT_TOLERANCE = 0.5;
+const BENT_ROUTE_PENALTY = 64;
 
 const BASE_EXPORT_VIEWBOX: CountryLabelExportViewBox = {
   x: 30,
@@ -248,7 +258,14 @@ const segmentIntersectsRect = (
   return start.x > rect.left && start.x < rect.right && maxY > rect.top && minY < rect.bottom;
 };
 
-const segmentsCross = (
+const expandRect = (rect: CountryLabelRect, padding: number): CountryLabelRect => ({
+  left: rect.left - padding,
+  right: rect.right + padding,
+  top: rect.top - padding,
+  bottom: rect.bottom + padding,
+});
+
+const segmentsOverlap = (
   firstStart: MapPoint,
   firstEnd: MapPoint,
   secondStart: MapPoint,
@@ -256,19 +273,27 @@ const segmentsCross = (
 ) => {
   const firstHorizontal = Math.abs(firstStart.y - firstEnd.y) < 0.001;
   const secondHorizontal = Math.abs(secondStart.y - secondEnd.y) < 0.001;
-  if (firstHorizontal === secondHorizontal) return false;
+  if (firstHorizontal !== secondHorizontal) return false;
 
-  const horizontalStart = firstHorizontal ? firstStart : secondStart;
-  const horizontalEnd = firstHorizontal ? firstEnd : secondEnd;
-  const verticalStart = firstHorizontal ? secondStart : firstStart;
-  const verticalEnd = firstHorizontal ? secondEnd : firstEnd;
+  if (firstHorizontal) {
+    if (Math.abs(firstStart.y - secondStart.y) > COUNTRY_LABEL_ROUTE_SEPARATION) return false;
+    return Math.min(
+      Math.max(firstStart.x, firstEnd.x),
+      Math.max(secondStart.x, secondEnd.x),
+    ) - Math.max(
+      Math.min(firstStart.x, firstEnd.x),
+      Math.min(secondStart.x, secondEnd.x),
+    ) > 0.5;
+  }
 
-  return (
-    verticalStart.x > Math.min(horizontalStart.x, horizontalEnd.x) &&
-    verticalStart.x < Math.max(horizontalStart.x, horizontalEnd.x) &&
-    horizontalStart.y > Math.min(verticalStart.y, verticalEnd.y) &&
-    horizontalStart.y < Math.max(verticalStart.y, verticalEnd.y)
-  );
+  if (Math.abs(firstStart.x - secondStart.x) > COUNTRY_LABEL_ROUTE_SEPARATION) return false;
+  return Math.min(
+    Math.max(firstStart.y, firstEnd.y),
+    Math.max(secondStart.y, secondEnd.y),
+  ) - Math.max(
+    Math.min(firstStart.y, firstEnd.y),
+    Math.min(secondStart.y, secondEnd.y),
+  ) > 0.5;
 };
 
 const getAbsoluteLeaderPoints = (label: CountryLabelLayout, scale: number) => (
@@ -278,14 +303,16 @@ const getAbsoluteLeaderPoints = (label: CountryLabelLayout, scale: number) => (
   }))
 );
 
-const routeIntersectsRect = (points: MapPoint[], rect: CountryLabelRect) => (
-  points.slice(1).some((point, index) => segmentIntersectsRect(points[index], point, rect))
+const routeIntersectsRect = (points: MapPoint[], rect: CountryLabelRect, padding = 0) => (
+  points.slice(1).some((point, index) => (
+    segmentIntersectsRect(points[index], point, padding > 0 ? expandRect(rect, padding) : rect)
+  ))
 );
 
-const routesCross = (first: MapPoint[], second: MapPoint[]) => {
+const routesOverlap = (first: MapPoint[], second: MapPoint[]) => {
   for (let firstIndex = 1; firstIndex < first.length; firstIndex += 1) {
     for (let secondIndex = 1; secondIndex < second.length; secondIndex += 1) {
-      if (segmentsCross(
+      if (segmentsOverlap(
         first[firstIndex - 1],
         first[firstIndex],
         second[secondIndex - 1],
@@ -323,7 +350,6 @@ const createLeaderPoints = (
   width: number,
   scale: number,
   forcedSide?: CountryLabelSide,
-  laneOffset = 0,
 ) => {
   const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
   const side = forcedSide ?? (center.x < anchorScreen.x ? 'left' : 'right');
@@ -337,7 +363,8 @@ const createLeaderPoints = (
     y: center.y,
   };
 
-  if (Math.abs(start.y - end.y) < 0.001) {
+  if (Math.abs(start.y - end.y) <= STRAIGHT_ALIGNMENT_TOLERANCE) {
+    end.y = start.y;
     return {
       side,
       points: [start, end].map((point) => ({
@@ -347,9 +374,10 @@ const createLeaderPoints = (
     };
   }
 
-  const availableHorizontal = Math.abs(end.x - start.x);
-  const cornerRun = Math.min(20 + laneOffset, Math.max(6, availableHorizontal / 2));
-  const laneX = start.x + direction * cornerRun;
+  const availableHorizontal = direction * (end.x - start.x);
+  if (availableHorizontal < MIN_DOT_DEPARTURE + COUNTRY_LABEL_MIN_PILL_APPROACH) return null;
+
+  const laneX = end.x - direction * COUNTRY_LABEL_MIN_PILL_APPROACH;
   const points = [
     start,
     { x: laneX, y: start.y },
@@ -385,13 +413,20 @@ const layoutConflicts = (
   if (occupied.some((other) => countryLabelRectsOverlap(layout.rect, other.rect))) return true;
 
   const points = getAbsoluteLeaderPoints(layout, scale);
-  if (occupied.some((other) => routeIntersectsRect(points, other.rect))) return true;
+  if (occupied.some((other) => (
+    routeIntersectsRect(points, other.rect, COUNTRY_LABEL_LEADER_CLEARANCE)
+  ))) {
+    return true;
+  }
 
   return occupied.some((other) => {
     const otherPoints = getAbsoluteLeaderPoints(other, scale);
     return (
       otherPoints.length > 1 &&
-      (routeIntersectsRect(otherPoints, layout.rect) || routesCross(points, otherPoints))
+      (
+        routeIntersectsRect(otherPoints, layout.rect, COUNTRY_LABEL_LEADER_CLEARANCE) ||
+        routesOverlap(points, otherPoints)
+      )
     );
   });
 };
@@ -412,28 +447,77 @@ const createFloatingCandidates = (
   const centerY = (top + bottom) / 2;
   const halfWidth = footprint.labelWidth / 2;
   const halfHeight = COUNTRY_LABEL_HEIGHT / 2;
-  const horizontalX = {
-    left: left - FLOATING_GAP - halfWidth,
-    right: right + FLOATING_GAP + halfWidth,
+  const bentHorizontalX = {
+    left: left - BENT_FLOATING_GAP - halfWidth,
+    right: right + BENT_FLOATING_GAP + halfWidth,
   };
   const verticalY = {
     top: top - FLOATING_GAP - halfHeight,
     bottom: bottom + FLOATING_GAP + halfHeight,
   };
+  const sideAnchors = {
+    left: getSideAnchor(footprint, 'left'),
+    right: getSideAnchor(footprint, 'right'),
+  };
+  const straightPositions = [FLOATING_GAP, 40, 80, 120].flatMap((gap, gapIndex) => ([
+    {
+      id: `right-${gap}`,
+      x: right + gap + halfWidth,
+      y: sideAnchors.right.y * scale,
+      penalty: gapIndex * 8,
+      side: 'right' as const,
+    },
+    {
+      id: `left-${gap}`,
+      x: left - gap - halfWidth,
+      y: sideAnchors.left.y * scale,
+      penalty: gapIndex * 8,
+      side: 'left' as const,
+    },
+  ]));
 
-  const positions = [
-    { id: 'right', x: horizontalX.right, y: centerY, penalty: 0 },
-    { id: 'left', x: horizontalX.left, y: centerY, penalty: 0 },
+  const positions: Array<{
+    id: string;
+    x: number;
+    y: number;
+    penalty: number;
+    side?: CountryLabelSide;
+  }> = [
+    ...straightPositions,
     { id: 'top', x: centerX + 10, y: verticalY.top, penalty: 6 },
     { id: 'bottom', x: centerX - 10, y: verticalY.bottom, penalty: 6 },
-    { id: 'top-right', x: horizontalX.right, y: verticalY.top, penalty: 12 },
-    { id: 'top-left', x: horizontalX.left, y: verticalY.top, penalty: 12 },
-    { id: 'bottom-right', x: horizontalX.right, y: verticalY.bottom, penalty: 12 },
-    { id: 'bottom-left', x: horizontalX.left, y: verticalY.bottom, penalty: 12 },
-    { id: 'right-high', x: horizontalX.right, y: centerY - COUNTRY_LABEL_ROW_PITCH, penalty: 18 },
-    { id: 'right-low', x: horizontalX.right, y: centerY + COUNTRY_LABEL_ROW_PITCH, penalty: 18 },
-    { id: 'left-high', x: horizontalX.left, y: centerY - COUNTRY_LABEL_ROW_PITCH, penalty: 18 },
-    { id: 'left-low', x: horizontalX.left, y: centerY + COUNTRY_LABEL_ROW_PITCH, penalty: 18 },
+    { id: 'top-right', x: bentHorizontalX.right, y: verticalY.top, penalty: 12, side: 'right' },
+    { id: 'top-left', x: bentHorizontalX.left, y: verticalY.top, penalty: 12, side: 'left' },
+    { id: 'bottom-right', x: bentHorizontalX.right, y: verticalY.bottom, penalty: 12, side: 'right' },
+    { id: 'bottom-left', x: bentHorizontalX.left, y: verticalY.bottom, penalty: 12, side: 'left' },
+    {
+      id: 'right-high',
+      x: bentHorizontalX.right,
+      y: centerY - COUNTRY_LABEL_ROW_PITCH,
+      penalty: 18,
+      side: 'right',
+    },
+    {
+      id: 'right-low',
+      x: bentHorizontalX.right,
+      y: centerY + COUNTRY_LABEL_ROW_PITCH,
+      penalty: 18,
+      side: 'right',
+    },
+    {
+      id: 'left-high',
+      x: bentHorizontalX.left,
+      y: centerY - COUNTRY_LABEL_ROW_PITCH,
+      penalty: 18,
+      side: 'left',
+    },
+    {
+      id: 'left-low',
+      x: bentHorizontalX.left,
+      y: centerY + COUNTRY_LABEL_ROW_PITCH,
+      penalty: 18,
+      side: 'left',
+    },
   ];
 
   const seen = new Set<string>();
@@ -449,8 +533,9 @@ const createFloatingCandidates = (
     if (!rectSitsWithinBounds(rect, visibleBounds)) return;
     if (coversSelectedDot(rect, allFootprints, scale)) return;
 
-    const anchor = getNearestDot(footprint, center, scale);
-    const leader = createLeaderPoints(anchor, center, footprint.labelWidth, scale);
+    const anchor = position.side ? sideAnchors[position.side] : getNearestDot(footprint, center, scale);
+    const leader = createLeaderPoints(anchor, center, footprint.labelWidth, scale, position.side);
+    if (!leader) return;
     const layout: CountryLabelLayout = {
       name: footprint.name,
       anchor,
@@ -479,6 +564,7 @@ const createFloatingCandidates = (
     candidates.push({
       layout,
       score: routeLength + verticalDistance * 0.18 + position.penalty +
+        (leader.points.length > 2 ? BENT_ROUTE_PENALTY : 0) +
         (movesOutward ? 0 : 14) + positionIndex * 0.001,
     });
   });
@@ -565,20 +651,28 @@ const sortClusterForFloating = (cluster: CountryFootprint[], scale: number) => {
 
     return (
       aNeighbors - bNeighbors ||
+      a.labelWidth - b.labelWidth ||
       distanceBetween(bPoint, center) - distanceBetween(aPoint, center) ||
-      b.labelWidth - a.labelWidth ||
       a.name.localeCompare(b.name)
     );
   });
 };
 
-const buildRowGrid = (bounds: CountryLabelPlacementBounds) => {
+const buildRowGrid = (
+  bounds: CountryLabelPlacementBounds,
+  preferredRows: number[] = [],
+) => {
   const minY = bounds.top + COUNTRY_LABEL_HEIGHT / 2;
   const maxY = bounds.bottom - COUNTRY_LABEL_HEIGHT / 2;
   const rows: number[] = [];
   for (let y = minY; y <= maxY + 0.001; y += COUNTRY_LABEL_ROW_GAP) rows.push(y);
   if (rows.length === 0 || Math.abs(rows[rows.length - 1] - maxY) > 0.001) rows.push(maxY);
-  return rows;
+  preferredRows.forEach((rowY) => {
+    if (rowY >= minY && rowY <= maxY) rows.push(rowY);
+  });
+  return rows
+    .sort((a, b) => a - b)
+    .filter((rowY, index, sortedRows) => index === 0 || Math.abs(rowY - sortedRows[index - 1]) > 0.001);
 };
 
 const allocateRailRows = (
@@ -589,11 +683,12 @@ const allocateRailRows = (
   allFootprints: CountryFootprint[],
   scale: number,
   getRowPenalty?: (footprint: CountryFootprint, rowY: number, index: number) => number,
+  targetYFor: (footprint: CountryFootprint) => number = (footprint) => footprint.center.y * scale,
 ) => {
   const sorted = [...footprints].sort((a, b) => (
-    a.center.y - b.center.y || a.center.x - b.center.x || a.name.localeCompare(b.name)
+    targetYFor(a) - targetYFor(b) || a.center.x - b.center.x || a.name.localeCompare(b.name)
   ));
-  const rows = buildRowGrid(bounds);
+  const rows = buildRowGrid(bounds, sorted.map(targetYFor));
   const costs = sorted.map(() => rows.map(() => Number.POSITIVE_INFINITY));
   const previousRows = sorted.map(() => rows.map(() => -1));
 
@@ -602,7 +697,7 @@ const allocateRailRows = (
       const rect = getRect(centerXFor(footprint), rowY, footprint.labelWidth);
       if (occupied.some((label) => countryLabelRectsOverlap(rect, label.rect))) return;
       if (coversSelectedDot(rect, allFootprints, scale)) return;
-      const localCost = Math.abs(rowY - footprint.center.y * scale) +
+      const localCost = Math.abs(rowY - targetYFor(footprint)) +
         (getRowPenalty?.(footprint, rowY, footprintIndex) ?? 0);
 
       if (footprintIndex === 0) {
@@ -638,7 +733,7 @@ const allocateRailRows = (
     const maximum = bounds.bottom - COUNTRY_LABEL_HEIGHT / 2;
     const start = Math.max(
       minimum,
-      Math.min(maximum - (sorted.length - 1) * COUNTRY_LABEL_ROW_PITCH, sorted[0].center.y * scale),
+      Math.min(maximum - (sorted.length - 1) * COUNTRY_LABEL_ROW_PITCH, targetYFor(sorted[0])),
     );
     return {
       sorted,
@@ -655,26 +750,155 @@ const allocateRailRows = (
   return { sorted, rows: allocatedRows };
 };
 
+const assignRailLanes = (
+  footprints: CountryFootprint[],
+  rows: number[],
+  side: CountryLabelSide,
+  scale: number,
+  portOffsets: Map<string, number>,
+  alignedEdge: number,
+  occupied: CountryLabelLayout[],
+) => {
+  const assignments = new Map<string, number>();
+  const intervals = footprints
+    .map((footprint, index) => {
+      const anchorY = getSideAnchor(footprint, side).y * scale +
+        (portOffsets.get(footprint.name) ?? 0);
+      return {
+        footprint,
+        rowY: rows[index],
+        name: footprint.name,
+        top: Math.min(anchorY, rows[index]),
+        bottom: Math.max(anchorY, rows[index]),
+        isStraight: Math.abs(anchorY - rows[index]) <= STRAIGHT_ALIGNMENT_TOLERANCE,
+      };
+    })
+    .filter((interval) => !interval.isStraight)
+    .sort((a, b) => a.top - b.top || a.bottom - b.bottom || a.name.localeCompare(b.name));
+  const laneIntervals: Array<Array<{ top: number; bottom: number }>> = [];
+  const direction = side === 'left' ? -1 : 1;
+
+  intervals.forEach((interval) => {
+    const anchor = getSideAnchor(interval.footprint, side);
+    const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
+    const start = {
+      x: anchorScreen.x + direction * DOT_LEADER_GAP,
+      y: anchorScreen.y + (portOffsets.get(interval.name) ?? 0),
+    };
+    let bestLane = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let laneIndex = 0; laneIndex < footprints.length + 24; laneIndex += 1) {
+      const laneIsAvailable = (laneIntervals[laneIndex] ?? []).every((assigned) => (
+        assigned.bottom + ROUTING_VERTICAL_CLEARANCE <= interval.top ||
+        interval.bottom + ROUTING_VERTICAL_CLEARANCE <= assigned.top
+      ));
+      if (!laneIsAvailable) continue;
+
+      const laneDepth = COUNTRY_LABEL_MIN_PILL_APPROACH + laneIndex * ROUTING_LANE_GAP;
+      const laneX = alignedEdge - direction * laneDepth;
+      const points = [
+        start,
+        { x: laneX, y: start.y },
+        { x: laneX, y: interval.rowY },
+        { x: alignedEdge, y: interval.rowY },
+      ];
+      if (Math.abs(laneX - start.x) < MIN_DOT_DEPARTURE) continue;
+      let score = laneIndex;
+      occupied.forEach((label) => {
+        if (routeIntersectsRect(points, label.rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
+          score += 1_000_000;
+        }
+        const otherPoints = getAbsoluteLeaderPoints(label, scale);
+        if (otherPoints.length > 1 && routesOverlap(points, otherPoints)) {
+          score += 1_000_000_000;
+        }
+      });
+      if (score < bestScore) {
+        bestScore = score;
+        bestLane = laneIndex;
+      }
+    }
+
+    laneIntervals[bestLane] = [
+      ...(laneIntervals[bestLane] ?? []),
+      { top: interval.top, bottom: interval.bottom },
+    ];
+    assignments.set(interval.name, bestLane);
+  });
+
+  return assignments;
+};
+
+const assignRailPortOffsets = (
+  footprints: CountryFootprint[],
+  rows: number[],
+  side: CountryLabelSide,
+  scale: number,
+) => {
+  const items = footprints.map((footprint, index) => ({
+    footprint,
+    index,
+    anchorY: getSideAnchor(footprint, side).y * scale,
+  })).sort((a, b) => a.anchorY - b.anchorY || a.footprint.name.localeCompare(b.footprint.name));
+  const offsets = new Map<string, number>();
+  const reservedStarts: number[] = [];
+
+  items.forEach((item) => {
+    const ownRow = rows[item.index];
+    const candidates = [0];
+    for (let step = 1; step < footprints.length + 8; step += 1) {
+      candidates.push(-step * ROUTING_PORT_MIN_SEPARATION, step * ROUTING_PORT_MIN_SEPARATION);
+    }
+    if (Math.abs(item.anchorY - ownRow) < ROUTING_PORT_MIN_SEPARATION) {
+      candidates.unshift(ownRow - item.anchorY);
+    }
+
+    const offset = candidates.find((candidateOffset) => {
+      const candidateY = item.anchorY + candidateOffset;
+      const clearsStarts = reservedStarts.every((reservedY) => (
+        Math.abs(candidateY - reservedY) >= ROUTING_PORT_MIN_SEPARATION
+      ));
+      const clearsRows = rows.every((rowY, rowIndex) => (
+        rowIndex === item.index ||
+        Math.abs(candidateY - rowY) >= ROUTING_PORT_MIN_SEPARATION
+      ));
+      return clearsStarts && clearsRows;
+    }) ?? 0;
+    offsets.set(item.footprint.name, offset);
+    reservedStarts.push(item.anchorY + offset);
+  });
+
+  return offsets;
+};
+
 const getRailRoute = (
   footprint: CountryFootprint,
   side: CountryLabelSide,
   rowY: number,
   alignedEdge: number,
-  index: number,
+  laneIndex: number,
   scale: number,
+  portOffset = 0,
 ) => {
   const anchor = getSideAnchor(footprint, side);
   const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
   const direction = side === 'left' ? -1 : 1;
   const start = {
     x: anchorScreen.x + direction * DOT_LEADER_GAP,
-    y: anchorScreen.y,
+    y: anchorScreen.y + portOffset,
   };
-  const desiredLaneX = start.x + direction *
-    (ROUTING_END_GAP + (index % 4) * ROUTING_LANE_GAP);
-  const laneX = side === 'left'
-    ? Math.max(alignedEdge, Math.min(start.x, desiredLaneX))
-    : Math.min(alignedEdge, Math.max(start.x, desiredLaneX));
+  if (Math.abs(start.y - rowY) <= STRAIGHT_ALIGNMENT_TOLERANCE) {
+    return {
+      anchor,
+      anchorScreen,
+      points: [start, { x: alignedEdge, y: start.y }],
+    };
+  }
+
+  const laneDepth = COUNTRY_LABEL_MIN_PILL_APPROACH +
+    Math.max(0, laneIndex) * ROUTING_LANE_GAP;
+  const laneX = alignedEdge - direction * laneDepth;
 
   return {
     anchor,
@@ -698,10 +922,18 @@ const getRailScore = (
 
   layouts.forEach((layout) => {
     const points = getAbsoluteLeaderPoints(layout, scale);
+    if (points.length > 2) score += BENT_ROUTE_PENALTY;
     points.slice(1).forEach((point, index) => {
       score += distanceBetween(points[index], point);
       allLayouts.forEach((other) => {
-        if (other.name !== layout.name && segmentIntersectsRect(points[index], point, other.rect)) {
+        if (
+          other.name !== layout.name &&
+          segmentIntersectsRect(
+            points[index],
+            point,
+            expandRect(other.rect, COUNTRY_LABEL_LEADER_CLEARANCE),
+          )
+        ) {
           score += 1_000_000;
         }
       });
@@ -713,8 +945,8 @@ const getRailScore = (
       if (countryLabelRectsOverlap(allLayouts[first].rect, allLayouts[second].rect)) score += 10_000_000;
       const firstPoints = getAbsoluteLeaderPoints(allLayouts[first], scale);
       const secondPoints = getAbsoluteLeaderPoints(allLayouts[second], scale);
-      if (firstPoints.length > 1 && secondPoints.length > 1 && routesCross(firstPoints, secondPoints)) {
-        score += 10_000;
+      if (firstPoints.length > 1 && secondPoints.length > 1 && routesOverlap(firstPoints, secondPoints)) {
+        score += 1_000_000_000;
       }
     }
   }
@@ -734,23 +966,51 @@ const createRailForSide = (
   if (footprints.length === 0) return { layouts: [], score: 0 };
 
   const maxWidth = Math.max(...footprints.map((footprint) => footprint.labelWidth));
-  const alignedEdge = side === 'left'
+  const baseAlignedEdge = side === 'left'
     ? Math.max(visibleBounds.left + maxWidth, regionBounds.left - RAIL_GUTTER)
     : Math.min(visibleBounds.right - maxWidth, regionBounds.right + RAIL_GUTTER);
+  const targetYFor = (footprint: CountryFootprint) => getSideAnchor(footprint, side).y * scale;
+  let alignedEdge = baseAlignedEdge;
   const centerXFor = (footprint: CountryFootprint) => side === 'left'
     ? alignedEdge - footprint.labelWidth / 2
     : alignedEdge + footprint.labelWidth / 2;
-  const getRowPenalty = (footprint: CountryFootprint, rowY: number, index: number) => {
-    const points = getRailRoute(footprint, side, rowY, alignedEdge, index, scale).points;
-    let penalty = 0;
+  const getRowPenalty = (footprint: CountryFootprint, rowY: number) => {
+    const rect = getRect(centerXFor(footprint), rowY, footprint.labelWidth);
+    let rectPenalty = 0;
     occupied.forEach((label) => {
-      if (routeIntersectsRect(points, label.rect)) penalty += 1_000_000;
       const otherPoints = getAbsoluteLeaderPoints(label, scale);
-      if (otherPoints.length > 1 && routesCross(points, otherPoints)) penalty += 10_000;
+      if (otherPoints.length > 1) {
+        if (routeIntersectsRect(otherPoints, rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
+          rectPenalty += 1_000_000;
+        }
+      }
     });
-    return penalty;
+    const isStraight = Math.abs(targetYFor(footprint) - rowY) <= STRAIGHT_ALIGNMENT_TOLERANCE;
+    const laneCount = isStraight ? 1 : footprints.length + 24;
+    let routePenalty = Number.POSITIVE_INFINITY;
+
+    for (let laneIndex = 0; laneIndex < laneCount; laneIndex += 1) {
+      const points = getRailRoute(footprint, side, rowY, alignedEdge, laneIndex, scale).points;
+      if (
+        points.length > 2 &&
+        Math.abs(points[1].x - points[0].x) < MIN_DOT_DEPARTURE
+      ) continue;
+      let candidatePenalty = laneIndex;
+      occupied.forEach((label) => {
+        if (routeIntersectsRect(points, label.rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
+          candidatePenalty += 1_000_000;
+        }
+        const otherPoints = getAbsoluteLeaderPoints(label, scale);
+        if (otherPoints.length > 1 && routesOverlap(points, otherPoints)) {
+          candidatePenalty += 1_000_000_000;
+        }
+      });
+      routePenalty = Math.min(routePenalty, candidatePenalty);
+    }
+
+    return rectPenalty + routePenalty;
   };
-  const allocated = allocateRailRows(
+  const allocateAtCurrentEdge = () => allocateRailRows(
     footprints,
     centerXFor,
     visibleBounds,
@@ -758,11 +1018,89 @@ const createRailForSide = (
     allFootprints,
     scale,
     getRowPenalty,
+    targetYFor,
   );
+  let allocated = allocateAtCurrentEdge();
+  let portOffsets = assignRailPortOffsets(allocated.sorted, allocated.rows, side, scale);
+  let laneAssignments = assignRailLanes(
+    allocated.sorted,
+    allocated.rows,
+    side,
+    scale,
+    portOffsets,
+    alignedEdge,
+    occupied,
+  );
+
+  for (let iteration = 0; iteration < 5; iteration += 1) {
+    const requiredEdge = allocated.sorted.reduce((edge, footprint, index) => {
+      const anchor = getSideAnchor(footprint, side);
+      const startX = anchor.x * scale + (side === 'left' ? -1 : 1) * DOT_LEADER_GAP;
+      const isStraight = Math.abs(targetYFor(footprint) - allocated.rows[index]) <=
+        STRAIGHT_ALIGNMENT_TOLERANCE;
+      if (!isStraight) return edge;
+      const candidate = side === 'left'
+        ? startX - MIN_DOT_DEPARTURE
+        : startX + MIN_DOT_DEPARTURE;
+      return side === 'left' ? Math.min(edge, candidate) : Math.max(edge, candidate);
+    }, baseAlignedEdge);
+    const obstacleEdge = allocated.sorted.reduce((edge, footprint, index) => {
+      const laneIndex = laneAssignments.get(footprint.name);
+      if (laneIndex === undefined) return edge;
+      const route = getRailRoute(
+        footprint,
+        side,
+        allocated.rows[index],
+        alignedEdge,
+        laneIndex,
+        scale,
+        portOffsets.get(footprint.name) ?? 0,
+      );
+      if (route.points.length < 4) return edge;
+      const laneDepth = COUNTRY_LABEL_MIN_PILL_APPROACH + laneIndex * ROUTING_LANE_GAP;
+      return occupied.reduce((nextEdge, label) => {
+        const paddedRect = expandRect(label.rect, COUNTRY_LABEL_LEADER_CLEARANCE);
+        if (!segmentIntersectsRect(route.points[1], route.points[2], paddedRect)) return nextEdge;
+        const candidate = side === 'left'
+          ? paddedRect.left - laneDepth
+          : paddedRect.right + laneDepth;
+        return side === 'left'
+          ? Math.min(nextEdge, candidate)
+          : Math.max(nextEdge, candidate);
+      }, edge);
+    }, alignedEdge);
+    const outwardEdge = side === 'left'
+      ? Math.min(alignedEdge, requiredEdge, obstacleEdge)
+      : Math.max(alignedEdge, requiredEdge, obstacleEdge);
+    const nextAlignedEdge = side === 'left'
+      ? Math.max(visibleBounds.left + maxWidth, outwardEdge)
+      : Math.min(visibleBounds.right - maxWidth, outwardEdge);
+    if (Math.abs(nextAlignedEdge - alignedEdge) <= 0.001) break;
+    alignedEdge = nextAlignedEdge;
+    allocated = allocateAtCurrentEdge();
+    portOffsets = assignRailPortOffsets(allocated.sorted, allocated.rows, side, scale);
+    laneAssignments = assignRailLanes(
+      allocated.sorted,
+      allocated.rows,
+      side,
+      scale,
+      portOffsets,
+      alignedEdge,
+      occupied,
+    );
+  }
 
   const layouts = allocated.sorted.map((footprint, index) => {
     const center = { x: centerXFor(footprint), y: allocated.rows[index] };
-    const route = getRailRoute(footprint, side, center.y, alignedEdge, index, scale);
+    const route = getRailRoute(
+      footprint,
+      side,
+      center.y,
+      alignedEdge,
+      laneAssignments.get(footprint.name) ?? 0,
+      scale,
+      portOffsets.get(footprint.name) ?? 0,
+    );
     const { anchor, anchorScreen } = route;
 
     return {
@@ -851,6 +1189,46 @@ const createDenseRails = (
   };
 };
 
+const createCompactRail = (
+  footprints: CountryFootprint[],
+  visibleBounds: CountryLabelPlacementBounds,
+  scale: number,
+) => {
+  const extraHeight = getRequiredExtraHeight(footprints.length, visibleBounds);
+  const effectiveBounds = expandBoundsVertically(visibleBounds, extraHeight);
+  const regionBounds = getFootprintScreenBounds(footprints, scale);
+  const left = createRailForSide(
+    footprints,
+    'left',
+    regionBounds,
+    effectiveBounds,
+    [],
+    footprints,
+    scale,
+  );
+  const right = createRailForSide(
+    footprints,
+    'right',
+    regionBounds,
+    effectiveBounds,
+    [],
+    footprints,
+    scale,
+  );
+  const leftEdge = left.layouts[0]?.rect.right ?? Number.POSITIVE_INFINITY;
+  const rightEdge = right.layouts[0]?.rect.left ?? Number.NEGATIVE_INFINITY;
+  const leftIsOutside = leftEdge < regionBounds.left;
+  const rightIsOutside = rightEdge > regionBounds.right;
+  const layouts = leftIsOutside !== rightIsOutside
+    ? (leftIsOutside ? left.layouts : right.layouts)
+    : (left.score <= right.score ? left.layouts : right.layouts);
+
+  return {
+    layouts,
+    extraHeight,
+  };
+};
+
 const settleFloatingLayouts = (
   initialLayouts: CountryLabelLayout[],
   footprints: CountryFootprint[],
@@ -869,7 +1247,14 @@ const settleFloatingLayouts = (
       if (points.length < 2) continue;
 
       for (const other of layouts) {
-        if (other.name === label.name || !routeIntersectsRect(points, other.rect)) continue;
+        if (other.name === label.name) continue;
+        const otherPoints = getAbsoluteLeaderPoints(other, scale);
+        const hasConflict = routeIntersectsRect(
+          points,
+          other.rect,
+          COUNTRY_LABEL_LEADER_CLEARANCE,
+        ) || (otherPoints.length > 1 && routesOverlap(points, otherPoints));
+        if (!hasConflict) continue;
         if (other.placement === 'floating') {
           floatingName = other.name;
           break;
@@ -902,6 +1287,85 @@ const settleFloatingLayouts = (
   return layouts;
 };
 
+const createBestRailLayout = (
+  footprints: CountryFootprint[],
+  regionBounds: CountryLabelPlacementBounds,
+  visibleBounds: CountryLabelPlacementBounds,
+  occupied: CountryLabelLayout[],
+  allFootprints: CountryFootprint[],
+  scale: number,
+): RailResult => {
+  if (footprints.length === 0) return { layouts: [], score: 0 };
+
+  const sorted = [...footprints].sort((a, b) => (
+    a.center.y - b.center.y || a.center.x - b.center.x || a.name.localeCompare(b.name)
+  ));
+  const partitions: Array<{ left: CountryFootprint[]; right: CountryFootprint[] }> = [];
+  const seen = new Set<string>();
+  const addPartition = (left: CountryFootprint[], right: CountryFootprint[]) => {
+    const key = `${left.map((item) => item.name).sort().join('|')}::${right
+      .map((item) => item.name).sort().join('|')}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    partitions.push({ left, right });
+  };
+
+  if (sorted.length <= 8) {
+    for (let mask = 0; mask < 2 ** sorted.length; mask += 1) {
+      addPartition(
+        sorted.filter((_, index) => (mask & (1 << index)) === 0),
+        sorted.filter((_, index) => (mask & (1 << index)) !== 0),
+      );
+    }
+  } else {
+    addPartition(sorted, []);
+    addPartition([], sorted);
+    addPartition(
+      sorted.filter((_, index) => index % 2 === 0),
+      sorted.filter((_, index) => index % 2 === 1),
+    );
+    addPartition(
+      sorted.filter((_, index) => index % 2 === 1),
+      sorted.filter((_, index) => index % 2 === 0),
+    );
+    const centerX = sorted.reduce((sum, footprint) => sum + footprint.center.x, 0) / sorted.length;
+    addPartition(
+      sorted.filter((footprint) => footprint.center.x <= centerX),
+      sorted.filter((footprint) => footprint.center.x > centerX),
+    );
+  }
+
+  return partitions
+    .map((partition) => {
+      const left = createRailForSide(
+        partition.left,
+        'left',
+        regionBounds,
+        visibleBounds,
+        occupied,
+        allFootprints,
+        scale,
+      );
+      const right = createRailForSide(
+        partition.right,
+        'right',
+        regionBounds,
+        visibleBounds,
+        [...occupied, ...left.layouts],
+        allFootprints,
+        scale,
+      );
+      const layouts = [...left.layouts, ...right.layouts];
+      return {
+        layouts,
+        score: getRailScore(layouts, occupied, scale),
+        key: `${partition.left.map((item) => item.name).join('|')}::${partition.right
+          .map((item) => item.name).join('|')}`,
+      };
+    })
+    .sort((a, b) => a.score - b.score || a.key.localeCompare(b.key))[0];
+};
+
 const createHybridLayouts = (
   clusters: CountryFootprint[][],
   allFootprints: CountryFootprint[],
@@ -921,26 +1385,7 @@ const createHybridLayouts = (
 
     for (let iteration = 0; iteration <= ordered.length; iteration += 1) {
       const regionBounds = getFootprintScreenBounds(cluster, scale);
-      const left = createRailForSide(
-        railFootprints,
-        'left',
-        regionBounds,
-        visibleBounds,
-        occupied,
-        allFootprints,
-        scale,
-      );
-      const right = createRailForSide(
-        railFootprints,
-        'right',
-        regionBounds,
-        visibleBounds,
-        occupied,
-        allFootprints,
-        scale,
-      );
-      const chosenRail = left.score <= right.score ? left : right;
-      const workingOccupied = [...occupied, ...chosenRail.layouts];
+      const workingOccupied = [...occupied];
       const floatingLayouts: CountryLabelLayout[] = [];
       const failed: CountryFootprint[] = [];
 
@@ -971,7 +1416,20 @@ const createHybridLayouts = (
         continue;
       }
 
-      maxRailCount = Math.max(maxRailCount, railFootprints.length);
+      const chosenRail = createBestRailLayout(
+        railFootprints,
+        regionBounds,
+        visibleBounds,
+        [...occupied, ...floatingLayouts],
+        allFootprints,
+        scale,
+      );
+
+      maxRailCount = Math.max(
+        maxRailCount,
+        chosenRail.layouts.filter((layout) => layout.side === 'left').length,
+        chosenRail.layouts.filter((layout) => layout.side === 'right').length,
+      );
       occupied.push(...chosenRail.layouts, ...floatingLayouts);
       layouts.push(...chosenRail.layouts, ...floatingLayouts);
       break;
@@ -1105,7 +1563,15 @@ export const createCountryLabelComposition = (
   let outsideLayouts: CountryLabelLayout[] = [];
   let extraHeight = 0;
 
-  if (footprints.length >= DENSE_SELECTION_THRESHOLD) {
+  const useCompactRails = scale < COMPACT_RAIL_SCALE_THRESHOLD &&
+    footprints.length >= COMPACT_RAIL_LABEL_THRESHOLD;
+
+  if (useCompactRails) {
+    const compactResult = createCompactRail(footprints, visibleBounds, scale);
+    insideLayouts.length = 0;
+    outsideLayouts = compactResult.layouts;
+    extraHeight = compactResult.extraHeight;
+  } else if (footprints.length >= DENSE_SELECTION_THRESHOLD) {
     const denseResult = createDenseRails(
       footprints,
       [],
