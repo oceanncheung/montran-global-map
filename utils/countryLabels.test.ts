@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_DOTS } from '../constants';
 import { MapPoint } from '../types';
-import { COUNTRY_NAMES, MANUAL_MAPPINGS } from './mappings';
+import { COUNTRY_NAMES, MANUAL_MAPPINGS, MAP_DOTS } from './mappings';
 import {
   COUNTRY_LABEL_LEADER_CLEARANCE,
   COUNTRY_LABEL_MIN_PILL_APPROACH,
@@ -30,10 +29,19 @@ const EXACT_COUNTRIES = [
   'Bangladesh',
 ];
 
-const MAP_CONTENT_CENTER_X = (83 + 2668) / 2;
-const MAP_CONTENT_CENTER_Y = (71 + 1430) / 2;
-const MAP_FIT_WIDTH = 2668 - 83 + 160;
-const MAP_FIT_HEIGHT = 1430 - 71 + 160;
+const MAP_CONTENT_BOUNDS = MAP_DOTS.reduce(
+  (bounds, dot) => ({
+    left: Math.min(bounds.left, dot.x),
+    right: Math.max(bounds.right, dot.x),
+    top: Math.min(bounds.top, dot.y),
+    bottom: Math.max(bounds.bottom, dot.y),
+  }),
+  { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity },
+);
+const MAP_CONTENT_CENTER_X = (MAP_CONTENT_BOUNDS.left + MAP_CONTENT_BOUNDS.right) / 2;
+const MAP_CONTENT_CENTER_Y = (MAP_CONTENT_BOUNDS.top + MAP_CONTENT_BOUNDS.bottom) / 2;
+const MAP_FIT_WIDTH = MAP_CONTENT_BOUNDS.right - MAP_CONTENT_BOUNDS.left + 160;
+const MAP_FIT_HEIGHT = MAP_CONTENT_BOUNDS.bottom - MAP_CONTENT_BOUNDS.top + 160;
 
 const getOptions = (
   width = 1440,

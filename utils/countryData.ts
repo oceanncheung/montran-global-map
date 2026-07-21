@@ -3,6 +3,181 @@
 
 export type CountryDotMap = Record<string, number[]>;
 
+export const REPRESENTATIVE_MAP_DOTS: Array<{ x: number; y: number }> = [
+  {
+    "x": 2692.67,
+    "y": 1057.85
+  },
+  {
+    "x": 850.55,
+    "y": 772.76
+  },
+  {
+    "x": 872.48,
+    "y": 816.62
+  },
+  {
+    "x": 850.55,
+    "y": 641.18
+  },
+  {
+    "x": 1837.4,
+    "y": 992.06
+  },
+  {
+    "x": 1135.64,
+    "y": 794.69
+  },
+  {
+    "x": 521.6,
+    "y": 838.55
+  },
+  {
+    "x": 2712,
+    "y": 1123.64
+  },
+  {
+    "x": 806.69,
+    "y": 750.83
+  },
+  {
+    "x": 894.41,
+    "y": 1408.73
+  },
+  {
+    "x": 1267.22,
+    "y": 356.09
+  },
+  {
+    "x": 2451.44,
+    "y": 860.48
+  },
+  {
+    "x": 2604.95,
+    "y": 1101.71
+  },
+  {
+    "x": 258.44,
+    "y": 1057.85
+  },
+  {
+    "x": 1815.47,
+    "y": 1386.8
+  },
+  {
+    "x": 2363.72,
+    "y": 816.62
+  },
+  {
+    "x": 1837.4,
+    "y": 1408.73
+  },
+  {
+    "x": 2078.63,
+    "y": 1035.92
+  },
+  {
+    "x": 2712,
+    "y": 926.27
+  },
+  {
+    "x": 1837.4,
+    "y": 882.41
+  },
+  {
+    "x": 2561.09,
+    "y": 860.48
+  },
+  {
+    "x": 1727.75,
+    "y": 1123.64
+  },
+  {
+    "x": 2517.23,
+    "y": 926.27
+  },
+  {
+    "x": 2517.23,
+    "y": 1123.64
+  },
+  {
+    "x": 697.04,
+    "y": 816.62
+  },
+  {
+    "x": 2692.67,
+    "y": 1101.71
+  },
+  {
+    "x": 2539.16,
+    "y": 1189.43
+  },
+  {
+    "x": 2297.93,
+    "y": 860.48
+  },
+  {
+    "x": 718.97,
+    "y": 860.48
+  },
+  {
+    "x": 368.09,
+    "y": 1145.57
+  },
+  {
+    "x": 828.62,
+    "y": 772.76
+  },
+  {
+    "x": 1267.22,
+    "y": 1079.78
+  },
+  {
+    "x": 1683.89,
+    "y": 992.06
+  },
+  {
+    "x": 2473.37,
+    "y": 1013.99
+  },
+  {
+    "x": 1047.92,
+    "y": 1430
+  },
+  {
+    "x": 894.41,
+    "y": 882.41
+  },
+  {
+    "x": 2188.28,
+    "y": 706.97
+  },
+  {
+    "x": 2648.81,
+    "y": 1123.64
+  },
+  {
+    "x": 2604.95,
+    "y": 1013.99
+  },
+  {
+    "x": 2712,
+    "y": 882.41
+  },
+  {
+    "x": 762.83,
+    "y": 750.83
+  },
+  {
+    "x": 2517.23,
+    "y": 1057.85
+  },
+  {
+    "x": 2648.81,
+    "y": 1057.85
+  }
+];
+
 export const COUNTRY_NAMES: string[] = [
   "Afghanistan",
   "Akrotiri Sovereign Base Area",
@@ -72,7 +247,6 @@ export const COUNTRY_NAMES: string[] = [
   "Djibouti",
   "Dominica",
   "Dominican Republic",
-  "Timor-Leste",
   "Ecuador",
   "Egypt",
   "El Salvador",
@@ -234,6 +408,7 @@ export const COUNTRY_NAMES: string[] = [
   "Tajikistan",
   "Thailand",
   "The Bahamas",
+  "Timor-Leste",
   "Togo",
   "Tonga",
   "Trinidad and Tobago",
@@ -300,7 +475,6 @@ export const REPRESENTATIVE_DOT_COUNTRIES: string[] = [
   "Djibouti",
   "Dominica",
   "Dominican Republic",
-  "Timor-Leste",
   "El Salvador",
   "eSwatini",
   "Falkland Islands",
@@ -348,7 +522,6 @@ export const REPRESENTATIVE_DOT_COUNTRIES: string[] = [
   "Palau",
   "Palestine",
   "Panama",
-  "Papua New Guinea",
   "Pitcairn Islands",
   "Puerto Rico",
   "Qatar",
@@ -377,6 +550,7 @@ export const REPRESENTATIVE_DOT_COUNTRIES: string[] = [
   "Switzerland",
   "Taiwan",
   "The Bahamas",
+  "Timor-Leste",
   "Togo",
   "Tonga",
   "Trinidad and Tobago",
@@ -524,7 +698,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     745,
     755,
     759,
-    793,
     794,
     819,
     844,
@@ -532,7 +705,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     907,
     924,
     963,
-    988,
+    988
   ],
   "Canada": [
     1,
@@ -739,6 +912,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     790,
     791,
     792,
+    793,
     806,
     807,
     808,
@@ -893,7 +1067,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1432,
     1448,
     1458,
-    1501,
+    1501
   ],
   "Russia": [
     3,
@@ -1775,9 +1949,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     857,
     878,
     983,
-    1017,
-    1018,
-    1062,
+    1062
   ],
   "Finland": [
     661,
@@ -2092,8 +2264,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1477,
     1488,
     1544,
-    1563,
-    1564,
+    1564
   ],
   "Romania": [
     1293,
@@ -2117,8 +2288,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1532,
     1591,
     1598,
-    1650,
-    1655,
+    1650
   ],
   "Croatia": [
     1356,
@@ -2178,8 +2348,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1559,
     1579,
     1600,
-    1621,
-    1651,
+    1621
   ],
   "North Macedonia": [
     1444,
@@ -2196,8 +2365,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1578,
     1599,
     1609,
-    1638,
-    1656,
+    1656
   ],
   "Kyrgyzstan": [
     1481,
@@ -2272,6 +2440,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1758
   ],
   "Algeria": [
+    1563,
+    1638,
     1664,
     1673,
     1680,
@@ -2299,7 +2469,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1922,
     1928,
     1934,
-    1969,
+    1969
   ],
   "Afghanistan": [
     1566,
@@ -2319,6 +2489,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
   ],
   "Cyprus": [
     1610,
+    1695
   ],
   "India": [
     1643,
@@ -2327,7 +2498,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1684,
     1736,
     1763,
-    1771,
     1780,
     1781,
     1787,
@@ -2366,9 +2536,10 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2087,
     2093,
     2100,
-    2106,
+    2106
   ],
   "Egypt": [
+    1651,
     1703,
     1720,
     1727,
@@ -2383,14 +2554,15 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1902,
     1903,
     1909,
-    1936,
+    1936
   ],
   "Morocco": [
+    1655,
     1710,
     1719,
     1790,
     1828,
-    1900,
+    1900
   ],
   "Saudi Arabia": [
     1665,
@@ -2498,6 +2670,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1765
   ],
   "Bhutan": [
+    1771
   ],
   "Western Sahara": [
     1849,
@@ -2532,6 +2705,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1844
   ],
   "Mauritania": [
+    1017,
+    1018,
     1777,
     1837,
     1849,
@@ -2546,7 +2721,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1977,
     1978,
     1979,
-    2007,
+    2007
   ],
   "Mali": [
     1850,
@@ -2737,7 +2912,6 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2114
   ],
   "Colombia": [
-    2077,
     2090,
     2159,
     2160,
@@ -3304,6 +3478,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2689,
     2690,
     2692,
+    2693,
     2694,
     2696,
     2697,
@@ -3382,125 +3557,71 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2648,
     2651
   ],
-  "Dhekelia Sovereign Base Area": [
-    1610
-  ],
-  "Israel": [
-    1681,
-    1695,
-  ],
-  "Palestine": [
-    1681
-  ],
-  "Lebanon": [
-    1632
-  ],
-  "Suriname": [
-    2256
-  ],
-  "Guyana": [
-    2198,
-    2199
-  ],
-  "South Korea": [
-    1653,
-    1658
-  ],
-  "Costa Rica": [
-    2142
-  ],
-  "Nicaragua": [
-    2038
-  ],
-  "Saint Martin": [
-    2006
-  ],
-  "Sint Maarten": [
-    2006
-  ],
-  "Czechia": [
-    1273
-  ],
-  "Luxembourg": [
-    1264
-  ],
-  "Albania": [
-    1450,
-    1521
-  ],
-  "Kosovo": [
-    1444
-  ],
-  "Armenia": [
-    1494
-  ],
-  "Tunisia": [
-  ],
-  "Djibouti": [
-    2068
-  ],
-  "Switzerland": [
-    1292
-  ],
-  "Liechtenstein": [
-    1292
-  ],
-  "Qatar": [
-    1785
-  ],
-  "San Marino": [
-    1379
+  "Faroe Islands": [
+    2711
   ],
   "Haiti": [
-    2015
+    2709
   ],
   "Dominican Republic": [
-    2015
+    2709
   ],
-  "El Salvador": [
-    2038
+  "Turks and Caicos Islands": [
+    2709
   ],
-  "Timor-Leste": [
-    2255
+  "Puerto Rico": [
+    2731
   ],
-  "Monaco": [
-    1377
+  "Trinidad and Tobago": [
+    2703
   ],
-  "eSwatini": [
-    2604
+  "Saint Martin": [
+    2702
   ],
-  "Burundi": [
-    2295
+  "Sint Maarten": [
+    2702
   ],
-  "Andorra": [
-    1424
+  "Curaçao": [
+    2064
   ],
-  "Montenegro": [
-    1450
+  "Aruba": [
+    2064
   ],
-  "US Naval Base Guantanamo Bay": [
-    2006
+  "Grenada": [
+    2703
   ],
-  "Brazilian Island": [
-    2648
+  "Saint Vincent and the Grenadines": [
+    2703
   ],
-  "Moldova": [
-    1294
+  "Barbados": [
+    2703
   ],
-  "Lesotho": [
-    2618
+  "Saint Lucia": [
+    2703
   ],
-  "Togo": [
-    2129
+  "Dominica": [
+    2702
   ],
-  "Gibraltar": [
-    1598
+  "Montserrat": [
+    2702
   ],
-  "Belize": [
-    2038
+  "Antigua and Barbuda": [
+    2702
   ],
-  "Panama": [
-    2142
+  "Saint Kitts and Nevis": [
+    2702
+  ],
+  "United States Virgin Islands": [
+    2702
+  ],
+  "Saint Barthelemy": [
+    2702
+  ],
+  "Anguilla": [
+    2702
+  ],
+  "British Virgin Islands": [
+    2702
   ],
   "Papua New Guinea": [
     2234,
@@ -3510,257 +3631,307 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     2293,
     2298
   ],
-  "Gambia": [
-    2070
+  "Timor-Leste": [
+    2412
   ],
-  "Hong Kong S.A.R.": [
-    1919
+  "The Bahamas": [
+    1836
   ],
-  "Vatican": [
-    1460
+  "South Korea": [
+    1612
   ],
-  "Northern Cyprus": [
-    1610
+  "Montenegro": [
+    1422
   ],
-  "Cyprus No Mans Area": [
-    1610
+  "Kosovo": [
+    1444
   ],
-  "Siachen Glacier": [
-    1567
+  "Albania": [
+    1444
   ],
-  "Baykonur Cosmodrome": [
-    1320
+  "Guyana": [
+    2199
+  ],
+  "Fiji": [
+    2713
   ],
   "Akrotiri Sovereign Base Area": [
     1610
   ],
-  "Southern Patagonian Ice Field": [
-    2695
-  ],
-  "Bir Tawil": [
-    1903
-  ],
-  "Fiji": [
-    2453
-  ],
-  "New Caledonia": [
-    2549
-  ],
-  "Curaçao": [
-    2006
-  ],
-  "Aruba": [
-    2006
-  ],
-  "The Bahamas": [
-    1836,
-    1906
-  ],
-  "Turks and Caicos Islands": [
-    2015
-  ],
-  "Taiwan": [
-    1797
-  ],
-  "Saint Pierre and Miquelon": [
-    1303
-  ],
-  "Pitcairn Islands": [
-    2683
-  ],
-  "French Polynesia": [
-    2683
-  ],
-  "French Southern and Antarctic Lands": [
-    2391
-  ],
-  "Seychelles": [
-    2391
-  ],
-  "Kiribati": [
-    2456
-  ],
-  "Marshall Islands": [
-    2456
-  ],
-  "Trinidad and Tobago": [
-    2015
-  ],
-  "Grenada": [
-    2006
-  ],
-  "Saint Vincent and the Grenadines": [
-    2006
-  ],
-  "Barbados": [
-    2006
-  ],
-  "Saint Lucia": [
-    2006
-  ],
-  "Dominica": [
-    2006
-  ],
-  "United States Minor Outlying Islands": [
-    2006
-  ],
-  "Montserrat": [
-    2006
-  ],
-  "Antigua and Barbuda": [
-    2006
-  ],
-  "Saint Kitts and Nevis": [
-    2006
-  ],
-  "United States Virgin Islands": [
-    2006
-  ],
-  "Saint Barthelemy": [
-    2006
-  ],
-  "Puerto Rico": [
-    2015
-  ],
-  "Anguilla": [
-    2006
-  ],
-  "British Virgin Islands": [
-    2006
-  ],
-  "Jamaica": [
-    2006
-  ],
-  "Cayman Islands": [
-    1975
-  ],
-  "Bermuda": [
-    1590
-  ],
-  "Heard Island and McDonald Islands": [
-    2542
-  ],
-  "Saint Helena": [
-    2200
-  ],
-  "Mauritius": [
-    2441
-  ],
-  "Comoros": [
-    2411
-  ],
-  "São Tomé and Principe": [
-    2261
-  ],
-  "Cabo Verde": [
-    2031
-  ],
-  "Malta": [
-    1564
-  ],
-  "Jersey": [
-    1228
-  ],
-  "Guernsey": [
-    1187
-  ],
-  "Isle of Man": [
-    1102
-  ],
   "Aland": [
     893
   ],
-  "Faroe Islands": [
-    994
-  ],
-  "Indian Ocean Territories": [
-    2317
-  ],
-  "British Indian Ocean Territory": [
-    2158
-  ],
-  "Singapore": [
-    2254
-  ],
-  "Norfolk Island": [
-    2595
-  ],
-  "Cook Islands": [
-    2667
-  ],
-  "Tonga": [
-    2667
-  ],
-  "Wallis and Futuna": [
-    2667
-  ],
-  "Samoa": [
-    2667
-  ],
-  "Solomon Islands": [
-    2293
-  ],
-  "Tuvalu": [
-    2453
-  ],
-  "Maldives": [
-    2093
-  ],
-  "Nauru": [
-    2456
-  ],
-  "Federated States of Micronesia": [
-    2456
-  ],
-  "South Georgia and the Islands": [
-    2693
-  ],
-  "Falkland Islands": [
-    2693
-  ],
-  "Vanuatu": [
-    2456
-  ],
-  "Niue": [
-    2667
-  ],
   "American Samoa": [
-    2667
+    2701
   ],
-  "Palau": [
-    2453
+  "Andorra": [
+    1424
   ],
-  "Guam": [
-    2453
-  ],
-  "Northern Mariana Islands": [
-    2453
-  ],
-  "Bahrain": [
-    1785
-  ],
-  "Coral Sea Islands": [
-    2559
-  ],
-  "Spratly Islands": [
-    2137
-  ],
-  "Clipperton Island": [
-    2075
-  ],
-  "Macao S.A.R": [
-    1919
+  "Armenia": [
+    1494
   ],
   "Ashmore and Cartier Islands": [
     2455
   ],
+  "Bahrain": [
+    1785
+  ],
   "Bajo Nuevo Bank (Petrel Is.)": [
     2015
+  ],
+  "Baykonur Cosmodrome": [
+    1320
+  ],
+  "Belize": [
+    2038
+  ],
+  "Bermuda": [
+    2704
+  ],
+  "Bir Tawil": [
+    1903
+  ],
+  "Brazilian Island": [
+    2648
+  ],
+  "British Indian Ocean Territory": [
+    2705
+  ],
+  "Burundi": [
+    2295
+  ],
+  "Cabo Verde": [
+    2706
+  ],
+  "Cayman Islands": [
+    1975
+  ],
+  "Clipperton Island": [
+    2707
+  ],
+  "Comoros": [
+    2411
+  ],
+  "Cook Islands": [
+    2708
+  ],
+  "Coral Sea Islands": [
+    2559
+  ],
+  "Costa Rica": [
+    2142
+  ],
+  "Cyprus No Mans Area": [
+    1610
+  ],
+  "Czechia": [
+    1273
+  ],
+  "Dhekelia Sovereign Base Area": [
+    1610
+  ],
+  "Djibouti": [
+    2068
+  ],
+  "El Salvador": [
+    2038
+  ],
+  "eSwatini": [
+    2604
+  ],
+  "Falkland Islands": [
+    2710
+  ],
+  "Federated States of Micronesia": [
+    2712
+  ],
+  "French Polynesia": [
+    2714
+  ],
+  "French Southern and Antarctic Lands": [
+    2715
+  ],
+  "Gambia": [
+    2070
+  ],
+  "Gibraltar": [
+    1598
+  ],
+  "Guam": [
+    2716
+  ],
+  "Guernsey": [
+    1187
+  ],
+  "Heard Island and McDonald Islands": [
+    2717
+  ],
+  "Hong Kong S.A.R.": [
+    1919
+  ],
+  "Indian Ocean Territories": [
+    2718
+  ],
+  "Isle of Man": [
+    1102
+  ],
+  "Israel": [
+    1681
+  ],
+  "Jamaica": [
+    2006
+  ],
+  "Jersey": [
+    1228
+  ],
+  "Kiribati": [
+    2719
+  ],
+  "Lebanon": [
+    1632
+  ],
+  "Lesotho": [
+    2618
+  ],
+  "Liechtenstein": [
+    1292
+  ],
+  "Luxembourg": [
+    1264
+  ],
+  "Macao S.A.R": [
+    1919
+  ],
+  "Maldives": [
+    2720
+  ],
+  "Malta": [
+    1564
+  ],
+  "Marshall Islands": [
+    2721
+  ],
+  "Mauritius": [
+    2722
+  ],
+  "Moldova": [
+    1294
+  ],
+  "Monaco": [
+    1377
+  ],
+  "Nauru": [
+    2723
+  ],
+  "New Caledonia": [
+    2724
+  ],
+  "Nicaragua": [
+    2725
+  ],
+  "Niue": [
+    2726
+  ],
+  "Norfolk Island": [
+    2727
+  ],
+  "Northern Cyprus": [
+    1610
+  ],
+  "Northern Mariana Islands": [
+    2716
+  ],
+  "Palau": [
+    2728
+  ],
+  "Palestine": [
+    1681
+  ],
+  "Panama": [
+    2729
+  ],
+  "Pitcairn Islands": [
+    2730
+  ],
+  "Qatar": [
+    1785
+  ],
+  "Saint Helena": [
+    2732
+  ],
+  "Saint Pierre and Miquelon": [
+    1303
+  ],
+  "Samoa": [
+    2701
+  ],
+  "San Marino": [
+    1379
+  ],
+  "São Tomé and Principe": [
+    2261
+  ],
+  "Scarborough Reef": [
+    2053
   ],
   "Serranilla Bank": [
     2015
   ],
-  "Scarborough Reef": [
-    2053
+  "Seychelles": [
+    2733
+  ],
+  "Siachen Glacier": [
+    1567
+  ],
+  "Singapore": [
+    2254
+  ],
+  "Solomon Islands": [
+    2734
+  ],
+  "South Georgia and the Islands": [
+    2735
+  ],
+  "Southern Patagonian Ice Field": [
+    2695
+  ],
+  "Spratly Islands": [
+    2137
+  ],
+  "Suriname": [
+    2736
+  ],
+  "Switzerland": [
+    1292
+  ],
+  "Taiwan": [
+    2737
+  ],
+  "Togo": [
+    2129
+  ],
+  "Tonga": [
+    2738
+  ],
+  "Tunisia": [
+    1638
+  ],
+  "Tuvalu": [
+    2739
+  ],
+  "United States Minor Outlying Islands": [
+    2740
+  ],
+  "US Naval Base Guantanamo Bay": [
+    2741
+  ],
+  "Vanuatu": [
+    2742
+  ],
+  "Vatican": [
+    1460
+  ],
+  "Wallis and Futuna": [
+    2743
   ]
 };

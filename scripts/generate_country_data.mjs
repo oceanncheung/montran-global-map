@@ -20,13 +20,21 @@ const DEFAULT_GEO_CONSTANTS = {
   Y_OFFSET: 930,
 };
 
-const REPRESENTATIVE_DOT_DISTANCE_LIMIT = 120;
-const SHAPE_SAMPLE_DISTANCE_LIMIT = 180;
+const REPRESENTATIVE_DOT_REUSE_DISTANCE_LIMIT = 30;
+const REPRESENTATIVE_DOT_COLLISION_DISTANCE = 12;
+const REPRESENTATIVE_DOT_SHARED_DISTANCE_LIMIT = 44;
+const REPRESENTATIVE_GRID_PITCH = 21.93;
+const REPRESENTATIVE_GRID_ORIGIN = { x: 83, y: 71 };
+const REPRESENTATIVE_BOUNDS = {
+  minX: 61,
+  maxX: 2712,
+  minY: 71,
+  maxY: 1430,
+};
+const REPRESENTATIVE_WRAP_TOLERANCE = 100;
 const REPRESENTATIVE_DOT_EXCLUSIONS = new Set([
   'Antarctica',
 ]);
-const REPRESENTATIVE_DOT_OVERRIDES = {
-};
 const VISUAL_REGION_RULES = [
   {
     name: 'British Isles',
@@ -219,61 +227,6 @@ const VISUAL_REGION_RULES = [
       },
       'British Virgin Islands': {
         replace: [2006],
-      },
-    },
-  },
-  {
-    name: 'South Pacific Representation',
-    countries: {
-      // These small Pacific countries should read as Oceania on the artwork,
-      // not as scattered dots above Australia or on the Americas side.
-      Palau: {
-        replace: [2453],
-      },
-      Guam: {
-        replace: [2453],
-      },
-      'Northern Mariana Islands': {
-        replace: [2453],
-      },
-      'Federated States of Micronesia': {
-        replace: [2456],
-      },
-      Kiribati: {
-        replace: [2456],
-      },
-      'Marshall Islands': {
-        replace: [2456],
-      },
-      Nauru: {
-        replace: [2456],
-      },
-      'Solomon Islands': {
-        replace: [2293],
-      },
-      'American Samoa': {
-        replace: [2667],
-      },
-      'Cook Islands': {
-        replace: [2667],
-      },
-      Niue: {
-        replace: [2667],
-      },
-      Samoa: {
-        replace: [2667],
-      },
-      Tonga: {
-        replace: [2667],
-      },
-      'Wallis and Futuna': {
-        replace: [2667],
-      },
-      'French Polynesia': {
-        replace: [2683],
-      },
-      'Pitcairn Islands': {
-        replace: [2683],
       },
     },
   },
@@ -542,6 +495,12 @@ const geoToPixel = (lng, lat, constants) => ({
   y: -lat * constants.Y_SCALE + constants.Y_OFFSET,
 });
 
+const geoToWrappedPixels = (lng, lat, constants) => (
+  [-360, 0, 360].map((longitudeOffset) => (
+    geoToPixel(lng + longitudeOffset, lat, constants)
+  ))
+);
+
 const normalizeLng = (lng) => {
   let normalized = lng;
 
@@ -606,8 +565,8 @@ const getLargestPartFeature = (feature) => {
 
 const getRepresentativePoints = (feature, constants) => {
   const points = [
-    d3.geoCentroid(feature),
     d3.geoCentroid(getLargestPartFeature(feature)),
+    d3.geoCentroid(feature),
     getBoundsCenter(feature),
   ];
 
@@ -621,7 +580,7 @@ const getRepresentativePoints = (feature, constants) => {
     unique.push({
       lng: normalizeLng(lng),
       lat,
-      pixel: geoToPixel(normalizeLng(lng), lat, constants),
+      pixels: geoToWrappedPixels(normalizeLng(lng), lat, constants),
     });
   }
 
@@ -656,7 +615,7 @@ const getFeatureShapePoints = (feature, constants) => {
       points.push({
         lng: normalizedLng,
         lat,
-        pixel: geoToPixel(normalizedLng, lat, constants),
+        pixels: geoToWrappedPixels(normalizedLng, lat, constants),
       });
     }
   }
@@ -682,74 +641,183 @@ const applyVisualRegionRules = (mapping) => {
   }
 };
 
-const pickRepresentativeDot = ({
-  countryName,
-  feature,
-  dotCoords,
-  constants,
-}) => {
-  const overrideDots = REPRESENTATIVE_DOT_OVERRIDES[countryName];
-  if (overrideDots?.length) {
-    return {
-      mode: 'override',
-      dots: [...overrideDots],
-    };
+const getDistanceToPoints = (dot, points) => {
+  let bestDistance = Infinity;
+
+  for (const point of points) {
+    for (const pixel of point.pixels) {
+      bestDistance = Math.min(bestDistance, Math.hypot(dot.x - pixel.x, dot.y - pixel.y));
+    }
   }
 
-  if (REPRESENTATIVE_DOT_EXCLUSIONS.has(countryName)) {
-    return null;
-  }
+  return bestDistance;
+};
 
-  const representativePoints = getRepresentativePoints(feature, constants);
-  const shapePoints = getFeatureShapePoints(feature, constants);
+const findNearestDotToPoints = (dotCoords, points) => {
   let best = null;
 
   for (const dot of dotCoords) {
-    let bestPointDistance = Infinity;
-
-    for (const point of representativePoints) {
-      const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
-      if (distance < bestPointDistance) {
-        bestPointDistance = distance;
-      }
-    }
-
-    if (!best || bestPointDistance < best.distance) {
+    const distance = getDistanceToPoints(dot, points);
+    if (!best || distance < best.distance) {
       best = {
         dotIndex: dot.index,
-        distance: bestPointDistance,
+        distance,
       };
     }
   }
 
-  if ((!best || best.distance > REPRESENTATIVE_DOT_DISTANCE_LIMIT) && shapePoints.length > 0) {
-    for (const dot of dotCoords) {
-      let bestShapeDistance = Infinity;
+  return best;
+};
 
-      for (const point of shapePoints) {
-        const distance = Math.hypot(dot.x - point.pixel.x, dot.y - point.pixel.y);
-        if (distance < bestShapeDistance) {
-          bestShapeDistance = distance;
+const getDistanceBetweenPointSets = (firstPoints, secondPoints) => {
+  let bestDistance = Infinity;
+
+  for (const firstPoint of firstPoints) {
+    for (const firstPixel of firstPoint.pixels) {
+      for (const secondPoint of secondPoints) {
+        for (const secondPixel of secondPoint.pixels) {
+          bestDistance = Math.min(
+            bestDistance,
+            Math.hypot(firstPixel.x - secondPixel.x, firstPixel.y - secondPixel.y),
+          );
         }
-      }
-
-      if (!best || bestShapeDistance < best.distance) {
-        best = {
-          dotIndex: dot.index,
-          distance: bestShapeDistance,
-        };
       }
     }
   }
 
-  if (!best) {
-    return null;
+  return bestDistance;
+};
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const getRepresentativeTargetPixel = (representativePoints, dotCoords) => {
+  let best = null;
+
+  representativePoints.forEach((point, pointIndex) => {
+    for (const pixel of point.pixels) {
+      const outsideX = Math.max(
+        REPRESENTATIVE_BOUNDS.minX - pixel.x,
+        pixel.x - REPRESENTATIVE_BOUNDS.maxX,
+        0,
+      );
+      const outsideY = Math.max(
+        REPRESENTATIVE_BOUNDS.minY - pixel.y,
+        pixel.y - REPRESENTATIVE_BOUNDS.maxY,
+        0,
+      );
+
+      if (outsideX > REPRESENTATIVE_WRAP_TOLERANCE || outsideY > REPRESENTATIVE_WRAP_TOLERANCE) {
+        continue;
+      }
+
+      const candidate = {
+        x: clamp(pixel.x, REPRESENTATIVE_BOUNDS.minX, REPRESENTATIVE_BOUNDS.maxX),
+        y: clamp(pixel.y, REPRESENTATIVE_BOUNDS.minY, REPRESENTATIVE_BOUNDS.maxY),
+      };
+      const nearestMapDistance = dotCoords.reduce(
+        (distance, dot) => Math.min(distance, Math.hypot(dot.x - candidate.x, dot.y - candidate.y)),
+        Infinity,
+      );
+      const score = nearestMapDistance + (outsideX + outsideY) * 2 + pointIndex * 8;
+
+      if (!best || score < best.score) {
+        best = { ...candidate, score };
+      }
+    }
+  });
+
+  if (best) {
+    return { x: best.x, y: best.y };
   }
 
+  const fallback = representativePoints[0]?.pixels[1] ?? representativePoints[0]?.pixels[0];
+  if (!fallback) return null;
+
   return {
-    mode: best.distance <= SHAPE_SAMPLE_DISTANCE_LIMIT ? 'nearest-shared-dot' : 'remote-nearest-shared-dot',
-    dots: [best.dotIndex],
-    distance: Number(best.distance.toFixed(2)),
+    x: clamp(fallback.x, REPRESENTATIVE_BOUNDS.minX, REPRESENTATIVE_BOUNDS.maxX),
+    y: clamp(fallback.y, REPRESENTATIVE_BOUNDS.minY, REPRESENTATIVE_BOUNDS.maxY),
+  };
+};
+
+const snapRepresentativeCoordinate = (value, origin) => (
+  origin + Math.round((value - origin) / REPRESENTATIVE_GRID_PITCH) * REPRESENTATIVE_GRID_PITCH
+);
+
+const createRepresentativeDot = (target, dotCoords) => {
+  const snappedTarget = {
+    x: clamp(
+      snapRepresentativeCoordinate(target.x, REPRESENTATIVE_GRID_ORIGIN.x),
+      REPRESENTATIVE_BOUNDS.minX,
+      REPRESENTATIVE_BOUNDS.maxX,
+    ),
+    y: clamp(
+      snapRepresentativeCoordinate(target.y, REPRESENTATIVE_GRID_ORIGIN.y),
+      REPRESENTATIVE_BOUNDS.minY,
+      REPRESENTATIVE_BOUNDS.maxY,
+    ),
+  };
+  const offsets = [[0, 0]];
+
+  for (let radius = 1; radius <= 4; radius += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      offsets.push([dx, -radius], [dx, radius]);
+    }
+    for (let dy = -radius + 1; dy < radius; dy += 1) {
+      offsets.push([-radius, dy], [radius, dy]);
+    }
+  }
+
+  const candidates = offsets
+    .map(([dx, dy]) => ({
+      x: clamp(
+        snappedTarget.x + dx * REPRESENTATIVE_GRID_PITCH,
+        REPRESENTATIVE_BOUNDS.minX,
+        REPRESENTATIVE_BOUNDS.maxX,
+      ),
+      y: clamp(
+        snappedTarget.y + dy * REPRESENTATIVE_GRID_PITCH,
+        REPRESENTATIVE_BOUNDS.minY,
+        REPRESENTATIVE_BOUNDS.maxY,
+      ),
+    }))
+    .filter((candidate, index, candidatesList) => (
+      candidatesList.findIndex((other) => other.x === candidate.x && other.y === candidate.y) === index
+    ))
+    .sort((a, b) => (
+      Math.hypot(a.x - target.x, a.y - target.y) - Math.hypot(b.x - target.x, b.y - target.y)
+    ));
+
+  for (const candidate of candidates) {
+    const collision = dotCoords.some((dot) => (
+      Math.hypot(dot.x - candidate.x, dot.y - candidate.y) < REPRESENTATIVE_DOT_COLLISION_DISTANCE
+    ));
+    if (!collision) return candidate;
+  }
+
+  return snappedTarget;
+};
+
+const pickRepresentativeDot = ({ feature, dotCoords, constants }) => {
+  const representativePoints = getRepresentativePoints(feature, constants);
+  const nearest = findNearestDotToPoints(dotCoords, representativePoints);
+
+  if (nearest && nearest.distance <= REPRESENTATIVE_DOT_REUSE_DISTANCE_LIMIT) {
+    return {
+      mode: 'nearest-shared-dot',
+      dots: [nearest.dotIndex],
+      distance: Number(nearest.distance.toFixed(2)),
+    };
+  }
+
+  // Bounds centers can fall in open water for scattered territories. Creation
+  // uses the area-weighted centroid or the largest land part instead.
+  const target = getRepresentativeTargetPixel(representativePoints.slice(0, 2), dotCoords);
+  if (!target) return null;
+
+  return {
+    mode: 'generated-representative-dot',
+    target,
+    distance: nearest ? Number(nearest.distance.toFixed(2)) : null,
   };
 };
 
@@ -758,22 +826,73 @@ const assignRepresentativeDots = ({
   featureMeta,
   dotCoords,
   constants,
+  directlyMappedCountryNames,
   representativeDotAssignments,
+  representativeMapDots,
 }) => {
-  for (const { name, feature } of featureMeta) {
-    if (mapping[name]?.length) continue;
+  const sortedFeatureMeta = [...featureMeta].sort((a, b) => a.name.localeCompare(b.name));
+  const representativeOwnersByDot = new Map();
 
-    const pick = pickRepresentativeDot({
-      countryName: name,
+  for (const { name, feature } of sortedFeatureMeta) {
+    if (REPRESENTATIVE_DOT_EXCLUSIONS.has(name)) continue;
+    if (directlyMappedCountryNames.has(name) && mapping[name]?.length) continue;
+
+    const representativePoints = getRepresentativePoints(feature, constants).slice(0, 2);
+    let pick = pickRepresentativeDot({
       feature,
       dotCoords,
       constants,
     });
 
-    if (!pick?.dots?.length) continue;
+    if (!pick) continue;
 
-    mapping[name] = sortUniqueDots(pick.dots);
-    representativeDotAssignments[name] = pick;
+    if (pick.dots?.length) {
+      const incompatibleOwner = pick.dots.some((dotIndex) => (
+        (representativeOwnersByDot.get(dotIndex) ?? []).some((owner) => (
+          getDistanceBetweenPointSets(representativePoints, owner.points)
+            > REPRESENTATIVE_DOT_SHARED_DISTANCE_LIMIT
+        ))
+      ));
+
+      if (incompatibleOwner) {
+        const target = getRepresentativeTargetPixel(representativePoints, dotCoords);
+        if (!target) continue;
+        pick = {
+          mode: 'generated-representative-dot',
+          target,
+          distance: pick.distance,
+        };
+      }
+    }
+
+    if (pick.dots?.length) {
+      mapping[name] = sortUniqueDots(pick.dots);
+      representativeDotAssignments[name] = pick;
+      for (const dotIndex of pick.dots) {
+        if (!representativeOwnersByDot.has(dotIndex)) representativeOwnersByDot.set(dotIndex, []);
+        representativeOwnersByDot.get(dotIndex).push({ name, points: representativePoints });
+      }
+      continue;
+    }
+
+    const createdDot = createRepresentativeDot(pick.target, dotCoords);
+    const representativeDot = {
+      x: Number(createdDot.x.toFixed(3)),
+      y: Number(createdDot.y.toFixed(3)),
+    };
+    const dotIndex = dotCoords.length;
+    dotCoords.push({
+      index: dotIndex,
+      ...representativeDot,
+    });
+    representativeMapDots.push(representativeDot);
+
+    mapping[name] = [dotIndex];
+    representativeDotAssignments[name] = {
+      ...pick,
+      dots: [dotIndex],
+    };
+    representativeOwnersByDot.set(dotIndex, [{ name, points: representativePoints }]);
   }
 };
 
@@ -852,10 +971,12 @@ const fillUnassignedDotComponents = ({
         ];
 
         for (const point of candidatePoints) {
-          const distance = Math.hypot(point.pixel.x - centroid.x, point.pixel.y - centroid.y);
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            bestCountryName = name;
+          for (const pixel of point.pixels) {
+            const distance = Math.hypot(pixel.x - centroid.x, pixel.y - centroid.y);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestCountryName = name;
+            }
           }
         }
       }
@@ -1120,14 +1241,7 @@ const generateCountryData = async () => {
     mapping[label].push(index);
   }
 
-  const representativeDotAssignments = {};
-  assignRepresentativeDots({
-    mapping,
-    featureMeta,
-    dotCoords,
-    constants,
-    representativeDotAssignments,
-  });
+  const directlyMappedCountryNames = new Set(seedLabels.filter(Boolean));
 
   applyVisualRegionRules(mapping);
 
@@ -1151,12 +1265,16 @@ const generateCountryData = async () => {
     dotCoords,
   });
 
+  const representativeDotAssignments = {};
+  const representativeMapDots = [];
   assignRepresentativeDots({
     mapping,
     featureMeta,
     dotCoords,
     constants,
+    directlyMappedCountryNames,
     representativeDotAssignments,
+    representativeMapDots,
   });
 
   const mappedCountryCount = Object.keys(mapping).length;
@@ -1165,16 +1283,17 @@ const generateCountryData = async () => {
   const propagatedDotCount = finalLabels.filter(Boolean).length - seededDotCount;
   const representativeCountryNames = Object.keys(representativeDotAssignments).sort((a, b) => a.localeCompare(b));
 
-  const output = `// This file is generated by scripts/generate_country_data.mjs.\n// Do not edit it by hand; regenerate it with \`npm run generate:mappings\`.\n\nexport type CountryDotMap = Record<string, number[]>;\n\nexport const COUNTRY_NAMES: string[] = ${JSON.stringify(countryNames, null, 2)};\n\nexport const REPRESENTATIVE_DOT_COUNTRIES: string[] = ${JSON.stringify(representativeCountryNames, null, 2)};\n\nexport const MANUAL_MAPPINGS: CountryDotMap = ${JSON.stringify(mapping, null, 2)};\n`;
+  const output = `// This file is generated by scripts/generate_country_data.mjs.\n// Do not edit it by hand; regenerate it with \`npm run generate:mappings\`.\n\nexport type CountryDotMap = Record<string, number[]>;\n\nexport const REPRESENTATIVE_MAP_DOTS: Array<{ x: number; y: number }> = ${JSON.stringify(representativeMapDots, null, 2)};\n\nexport const COUNTRY_NAMES: string[] = ${JSON.stringify(countryNames, null, 2)};\n\nexport const REPRESENTATIVE_DOT_COUNTRIES: string[] = ${JSON.stringify(representativeCountryNames, null, 2)};\n\nexport const MANUAL_MAPPINGS: CountryDotMap = ${JSON.stringify(mapping, null, 2)};\n`;
 
   await fs.writeFile(OUTPUT_PATH, output, 'utf8');
 
   console.log(`Parsed ${dots.length} dots.`);
   console.log(`Seeded ${seededDotCount} dots directly from country overlap.`);
   console.log(`Filled ${propagatedDotCount} additional dots via nearest-neighbor propagation.`);
-  console.log(`Assigned ${representativeCountryNames.length} shared representative country dots.`);
+  console.log(`Assigned ${representativeCountryNames.length} representative country mappings.`);
+  console.log(`Created ${representativeMapDots.length} geographic representative dots.`);
   console.log(`Mapped ${uniqueMappedDotCount} unique dots across ${mappedCountryCount} countries.`);
-  console.log(`Left ${dotCoords.length - finalLabels.filter(Boolean).length} dots unlabeled after seeding.`);
+  console.log(`Left ${dots.length - finalLabels.filter(Boolean).length} base dots unlabeled after seeding.`);
   console.log(`Wrote ${OUTPUT_PATH}.`);
 };
 
