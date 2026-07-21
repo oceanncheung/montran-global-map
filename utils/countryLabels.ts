@@ -71,7 +71,7 @@ interface CountryFootprint {
   name: string;
   dots: Array<MapPoint & { index: number }>;
   center: MapPoint;
-  interiorAnchor: MapPoint;
+  interiorAnchor: MapPoint & { index: number };
   minX: number;
   maxX: number;
   minY: number;
@@ -256,13 +256,13 @@ const getLargestConnectedComponent = (indexes: number[], mapDots: MapPoint[]) =>
 const getInteriorAnchor = (
   dots: Array<MapPoint & { index: number }>,
   center: MapPoint,
-) => dots
+): MapPoint & { index: number } => dots
   .map((dot) => ({
     dot,
     score: dots.filter((candidate) => distanceBetween(dot, candidate) <= 70).length * 20 -
       distanceBetween(dot, center),
   }))
-  .sort((a, b) => b.score - a.score)[0]?.dot ?? center;
+  .sort((a, b) => b.score - a.score)[0]?.dot ?? { ...center, index: -1 };
 
 const getCountryFootprint = (
   name: string,

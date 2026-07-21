@@ -12,6 +12,8 @@ import {
   MAP_DOTS,
   shouldRenderMapDot,
 } from '../utils/mappings';
+import { CONTINENT_DOT_MAP } from '../utils/continents';
+import type { ContinentName } from '../utils/continents';
 import {
   COUNTRY_LABEL_FONT_SIZE,
   CountryLabelPlacementBounds,
@@ -25,6 +27,7 @@ interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
   individuallySelectedCountries: string[];
+  selectedContinents: ContinentName[];
   highlightedCountries: string[];
   showCountryLabels: boolean;
   isSidebarOpen: boolean;
@@ -167,6 +170,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
   individuallySelectedCountries,
+  selectedContinents,
   highlightedCountries,
   showCountryLabels,
   isSidebarOpen,
@@ -212,10 +216,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         countryDots.forEach(idx => indices.add(idx));
       }
     });
+    selectedContinents.forEach((continent) => {
+      CONTINENT_DOT_MAP[continent].forEach((dotIndex) => indices.add(dotIndex));
+    });
     return indices;
-  }, [selectedCountries]);
+  }, [selectedCountries, selectedContinents]);
 
-  const individuallySelectedDotIndices = useMemo(() => {
+  const individuallySelectedDotIndices = useMemo<Set<number>>(() => {
     const indices = new Set<number>();
     individuallySelectedCountries.forEach((countryName) => {
       MANUAL_MAPPINGS[countryName]?.forEach((index) => indices.add(index));
@@ -224,7 +231,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [individuallySelectedCountries]);
 
   const labelObstacleDotIndexes = useMemo(() => (
-    Array.from(individuallySelectedDotIndices).sort((a, b) => a - b)
+    Array.from(individuallySelectedDotIndices).sort((a: number, b: number) => a - b)
   ), [individuallySelectedDotIndices]);
   const measureCountryLabelText = useMemo(() => (
     countryLabelFont

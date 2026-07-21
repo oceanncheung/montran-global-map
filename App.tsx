@@ -5,7 +5,7 @@ import MapCanvas from './components/MapCanvas';
 import { SidebarTab } from './types';
 import { MONTRAN_OFFICES } from './constants';
 import { COUNTRY_NAMES } from './utils/mappings';
-import { CONTINENT_COUNTRY_MAP, CONTINENT_OPTIONS, ContinentName } from './utils/continents';
+import { CONTINENT_OPTIONS, ContinentName } from './utils/continents';
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -67,13 +67,6 @@ const App: React.FC = () => {
     return MONTRAN_OFFICES.filter(o => selectedOffices.includes(o.id));
   }, [selectedOffices]);
 
-  const activeRegionCountries = useMemo(() => {
-    return Array.from(new Set([
-      ...selectedCountries,
-      ...selectedContinents.flatMap((continent) => CONTINENT_COUNTRY_MAP[continent]),
-    ]));
-  }, [selectedCountries, selectedContinents]);
-
   return (
     <div className="flex w-screen h-screen bg-white overflow-hidden relative">
       <Sidebar 
@@ -100,8 +93,9 @@ const App: React.FC = () => {
       <main className="flex-1 relative overflow-hidden flex flex-col">
         <MapCanvas 
           selectedOffices={currentOfficeObjects}
-          selectedCountries={activeRegionCountries}
+          selectedCountries={selectedCountries}
           individuallySelectedCountries={selectedCountries}
+          selectedContinents={selectedContinents}
           highlightedCountries={highlightedCountries}
           showCountryLabels={showCountryLabels}
           isSidebarOpen={isSidebarOpen}

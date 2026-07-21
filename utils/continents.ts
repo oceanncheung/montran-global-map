@@ -1,4 +1,8 @@
-import { COUNTRY_NAMES } from './mappings';
+import {
+  BASE_MAP_DOT_COUNT,
+  COUNTRY_NAMES,
+  MANUAL_MAPPINGS,
+} from './mappings';
 
 export const CONTINENT_OPTIONS = [
   'Asia',
@@ -287,6 +291,68 @@ export const CONTINENT_COUNTRY_MAP: Record<ContinentName, string[]> = CONTINENT_
   }),
   {} as Record<ContinentName, string[]>,
 );
+
+// Country footprints intentionally share a few coarse artwork dots. Continent
+// mode needs one visual owner per visible dot so borders do not produce holes
+// or light up a neighboring landmass.
+const VISUAL_CONTINENT_DOT_OWNERS: Record<number, ContinentName> = {
+  // Iceland sits beside Greenland on the compressed North Atlantic grid.
+  576: 'Europe',
+  593: 'Europe',
+  642: 'Europe',
+  678: 'Europe',
+  689: 'Europe',
+  745: 'Europe',
+  794: 'Europe',
+
+  // These Baltic dots were incorrectly inherited by Mauritania and Russia.
+  1017: 'Europe',
+  1018: 'Europe',
+  1153: 'Europe',
+  1248: 'Europe',
+
+  // Complete small gaps without changing their country-level mappings.
+  1658: 'Asia',
+  2077: 'North America',
+  2198: 'South America',
+  2453: 'Australia & Oceania',
+  2456: 'Australia & Oceania',
+
+  // Shared country dots are assigned to the landmass they visually touch.
+  2064: 'South America',
+  2412: 'Australia & Oceania',
+};
+
+const createContinentDotMap = (): Record<ContinentName, number[]> => {
+  const dotSets = CONTINENT_OPTIONS.reduce(
+    (acc, continent) => ({ ...acc, [continent]: new Set<number>() }),
+    {} as Record<ContinentName, Set<number>>,
+  );
+
+  CONTINENT_OPTIONS.forEach((continent) => {
+    CONTINENT_COUNTRY_MAP[continent].forEach((countryName) => {
+      MANUAL_MAPPINGS[countryName]?.forEach((dotIndex) => {
+        if (dotIndex < BASE_MAP_DOT_COUNT) dotSets[continent].add(dotIndex);
+      });
+    });
+  });
+
+  Object.entries(VISUAL_CONTINENT_DOT_OWNERS).forEach(([rawDotIndex, owner]) => {
+    const dotIndex = Number(rawDotIndex);
+    CONTINENT_OPTIONS.forEach((continent) => dotSets[continent].delete(dotIndex));
+    dotSets[owner].add(dotIndex);
+  });
+
+  return CONTINENT_OPTIONS.reduce(
+    (acc, continent) => ({
+      ...acc,
+      [continent]: [...dotSets[continent]].sort((a, b) => a - b),
+    }),
+    {} as Record<ContinentName, number[]>,
+  );
+};
+
+export const CONTINENT_DOT_MAP = createContinentDotMap();
 
 export const UNASSIGNED_CONTINENT_COUNTRIES = COUNTRY_NAMES.filter(
   (countryName) =>
