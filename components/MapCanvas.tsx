@@ -5,7 +5,13 @@ import type { Font } from 'opentype.js';
 import { geoToPixel } from '../utils/geo';
 import { OfficeLocation } from '../types';
 import { MONTRAN_OFFICES } from '../constants';
-import { MANUAL_MAPPINGS, MAP_DOTS } from '../utils/mappings';
+import {
+  BASE_MAP_DOTS,
+  BASE_MAP_DOT_COUNT,
+  MANUAL_MAPPINGS,
+  MAP_DOTS,
+  shouldRenderMapDot,
+} from '../utils/mappings';
 import {
   COUNTRY_LABEL_FONT_SIZE,
   CountryLabelPlacementBounds,
@@ -16,7 +22,7 @@ import {
 interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
-  labelCountries: string[];
+  individuallySelectedCountries: string[];
   highlightedCountries: string[];
   showCountryLabels: boolean;
   isSidebarOpen: boolean;
@@ -24,7 +30,7 @@ interface MapCanvasProps {
   onToggleGlobalGreen: (on: boolean) => void;
 }
 
-const MAP_CONTENT_BOUNDS = MAP_DOTS.reduce(
+const MAP_CONTENT_BOUNDS = BASE_MAP_DOTS.reduce(
   (bounds, dot) => ({
     left: Math.min(bounds.left, dot.x),
     right: Math.max(bounds.right, dot.x),
@@ -102,7 +108,7 @@ const DEFAULT_VIEW_FRAME = {
 const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
-  labelCountries,
+  individuallySelectedCountries,
   highlightedCountries,
   showCountryLabels,
   isSidebarOpen,
@@ -147,6 +153,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     });
     return indices;
   }, [selectedCountries]);
+
+  const individuallySelectedDotIndices = useMemo(() => {
+    const indices = new Set<number>();
+    individuallySelectedCountries.forEach((countryName) => {
+      MANUAL_MAPPINGS[countryName]?.forEach((index) => indices.add(index));
+    });
+    return indices;
+  }, [individuallySelectedCountries]);
 
   const allOfficeMarkers = useMemo(() => {
     const dotsWithIndices = MAP_DOTS.map((dot, index) => ({ ...dot, index }));
@@ -241,7 +255,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   }, [viewportSize.width, viewportSize.height, baseDefaultTransform, isSidebarOpen]);
 
   const countryLabelComposition = useMemo(() => createCountryLabelComposition(
-    showCountryLabels ? labelCountries : [],
+    showCountryLabels ? individuallySelectedCountries : [],
     MANUAL_MAPPINGS,
     MAP_DOTS,
     {
@@ -251,7 +265,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     },
   ), [
     showCountryLabels,
-    labelCountries,
+    individuallySelectedCountries,
     baseDefaultTransform.k,
     baseLabelPlacementBounds,
     viewportSize.height,
@@ -615,6 +629,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           <g id="grid-dots">
             {MAP_DOTS.map((dot, i) => {
               const isActive = isGlobalGreen || activeDotIndices.has(i);
+              if (!shouldRenderMapDot(i, individuallySelectedDotIndices.has(i))) return null;
+
+              const isRepresentative = i >= BASE_MAP_DOT_COUNT;
               return (
                 <circle
                   key={`dot-${i}`}
@@ -624,6 +641,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   fill={isActive ? "#009681" : "#d5d4d4"}
                   opacity={isActive ? 1 : 0.8}
                   className="grid-dot"
+                  data-dot-index={i}
+                  data-representative={isRepresentative ? 'true' : 'false'}
                   style={{ transition: 'fill 150ms ease, opacity 150ms ease' }}
                 />
               );

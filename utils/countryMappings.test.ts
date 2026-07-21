@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BASE_MAP_DOT_COUNT,
   COUNTRY_NAMES,
   MANUAL_MAPPINGS,
   MAP_DOTS,
   REPRESENTATIVE_MAP_DOTS,
+  shouldRenderMapDot,
 } from './mappings';
 
 const PACIFIC_SOVEREIGN_COUNTRIES = [
@@ -40,6 +42,17 @@ describe('country dot mappings', () => {
       });
     });
     expect(REPRESENTATIVE_MAP_DOTS.length).toBeGreaterThan(0);
+  });
+
+  it('keeps supplemental dots out of the illustration until their country is individually selected', () => {
+    expect(MAP_DOTS).toHaveLength(BASE_MAP_DOT_COUNT + REPRESENTATIVE_MAP_DOTS.length);
+    expect(shouldRenderMapDot(BASE_MAP_DOT_COUNT - 1, false)).toBe(true);
+
+    REPRESENTATIVE_MAP_DOTS.forEach((_, index) => {
+      const dotIndex = BASE_MAP_DOT_COUNT + index;
+      expect(shouldRenderMapDot(dotIndex, false)).toBe(false);
+      expect(shouldRenderMapDot(dotIndex, true)).toBe(true);
+    });
   });
 
   it('gives separately selectable Pacific countries distinct dots', () => {

@@ -9,4 +9,10 @@ export {
   REPRESENTATIVE_MAP_DOTS,
 } from './countryData';
 
+export { BASE_MAP_DOTS };
+export const BASE_MAP_DOT_COUNT = BASE_MAP_DOTS.length;
 export const MAP_DOTS = [...BASE_MAP_DOTS, ...REPRESENTATIVE_MAP_DOTS];
+
+export const shouldRenderMapDot = (dotIndex: number, isIndividuallySelected: boolean) => (
+  dotIndex < BASE_MAP_DOT_COUNT || isIndividuallySelected
+);

@@ -101,7 +101,7 @@ const App: React.FC = () => {
         <MapCanvas 
           selectedOffices={currentOfficeObjects}
           selectedCountries={activeRegionCountries}
-          labelCountries={selectedCountries}
+          individuallySelectedCountries={selectedCountries}
           highlightedCountries={highlightedCountries}
           showCountryLabels={showCountryLabels}
           isSidebarOpen={isSidebarOpen}
