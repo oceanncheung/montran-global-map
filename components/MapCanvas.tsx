@@ -17,6 +17,7 @@ interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
   selectedCountries: string[];
   labelCountries: string[];
+  highlightedCountries: string[];
   showCountryLabels: boolean;
   isSidebarOpen: boolean;
   isGlobalGreen: boolean;
@@ -93,6 +94,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
   labelCountries,
+  highlightedCountries,
   showCountryLabels,
   isSidebarOpen,
   isGlobalGreen,
@@ -110,6 +112,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [zoomScale, setZoomScale] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [countryLabelFont, setCountryLabelFont] = useState<Font | null>(null);
+  const highlightedCountrySet = useMemo(
+    () => new Set(highlightedCountries),
+    [highlightedCountries],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -622,6 +628,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               const mirrorPill = label.side === 'left';
               const textX = mirrorPill ? label.width / 2 - 25 : -label.width / 2 + 25;
               const textAnchor = mirrorPill ? 'end' : 'start';
+              const isHighlighted = highlightedCountrySet.has(label.name);
+              const labelTextColor = isHighlighted ? '#ffffff' : '#24423d';
               const glyphPath = countryLabelFont
                 ? createCountryLabelGlyphPath(countryLabelFont, label.name, textX, textAnchor)
                 : null;
@@ -634,6 +642,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   data-label-placement={label.placement}
                   data-label-side={label.side}
                   data-label-rail-index={label.railIndex}
+                  data-label-highlighted={isHighlighted ? 'true' : 'false'}
                   data-export-transform={labelTransform}
                   transform={labelTransform}
                   style={{ animationDelay: `${Math.min(index * 35, 210)}ms` }}
@@ -645,29 +654,29 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                       width={label.width}
                       height={label.height}
                       rx={label.height / 2}
-                      fill="#ffffff"
+                      fill={isHighlighted ? '#009681' : '#ffffff'}
                       stroke="#009681"
                       strokeWidth="1.15"
-                      strokeOpacity="0.48"
+                      strokeOpacity={isHighlighted ? 1 : 0.48}
                       filter="url(#country-label-shadow)"
                     />
                     <circle
                       cx={mirrorPill ? label.width / 2 - 13 : -label.width / 2 + 13}
                       cy="0"
                       r="3.5"
-                      fill="#009681"
+                      fill={isHighlighted ? '#ffffff' : '#009681'}
                     />
                     {glyphPath ? (
                       <path
                         d={glyphPath}
-                        fill="#24423d"
+                        fill={labelTextColor}
                         data-country-label-glyphs="true"
                       />
                     ) : (
                       <text
                         x={textX}
                         y="0.5"
-                        fill="#24423d"
+                        fill={labelTextColor}
                         fontFamily="Source Sans 3, sans-serif"
                         fontSize={COUNTRY_LABEL_FONT_SIZE}
                         fontWeight="400"

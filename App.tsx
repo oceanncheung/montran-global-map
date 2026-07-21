@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.OFFICES);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [highlightedCountries, setHighlightedCountries] = useState<string[]>([]);
   const [selectedContinents, setSelectedContinents] = useState<ContinentName[]>([]);
   const [isGlobalGreen, setIsGlobalGreen] = useState(false);
   const [showCountryLabels, setShowCountryLabels] = useState(true);
@@ -38,6 +39,13 @@ const App: React.FC = () => {
 
   const removeCountry = (name: string) => {
     setSelectedCountries(prev => prev.filter(c => c !== name));
+    setHighlightedCountries(prev => prev.filter(c => c !== name));
+  };
+
+  const toggleCountryHighlight = (name: string) => {
+    setHighlightedCountries(prev => (
+      prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name]
+    ));
   };
 
   const toggleContinent = (continent: ContinentName) => {
@@ -77,11 +85,13 @@ const App: React.FC = () => {
         toggleOffice={toggleOffice}
         toggleAllOffices={toggleAllOffices}
         selectedCountries={selectedCountries}
+        highlightedCountries={highlightedCountries}
         selectedContinents={selectedContinents}
         showCountryLabels={showCountryLabels}
         onToggleCountryLabels={() => setShowCountryLabels((visible) => !visible)}
         addCountry={addCountry}
         removeCountry={removeCountry}
+        toggleCountryHighlight={toggleCountryHighlight}
         toggleContinent={toggleContinent}
         allCountryNames={COUNTRY_NAMES}
         continentNames={CONTINENT_OPTIONS}
@@ -92,6 +102,7 @@ const App: React.FC = () => {
           selectedOffices={currentOfficeObjects}
           selectedCountries={activeRegionCountries}
           labelCountries={selectedCountries}
+          highlightedCountries={highlightedCountries}
           showCountryLabels={showCountryLabels}
           isSidebarOpen={isSidebarOpen}
           isGlobalGreen={isGlobalGreen}

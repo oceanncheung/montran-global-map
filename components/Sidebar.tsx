@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { Star, X } from 'lucide-react';
 import { SidebarTab } from '../types';
 import { MONTRAN_OFFICES, MontranOffice } from '../constants';
 import { ContinentName } from '../utils/continents';
@@ -12,11 +13,13 @@ interface SidebarProps {
   toggleOffice: (id: string) => void;
   toggleAllOffices: () => void;
   selectedCountries: string[];
+  highlightedCountries: string[];
   selectedContinents: ContinentName[];
   showCountryLabels: boolean;
   onToggleCountryLabels: () => void;
   addCountry: (name: string) => void;
   removeCountry: (name: string) => void;
+  toggleCountryHighlight: (name: string) => void;
   toggleContinent: (name: ContinentName) => void;
   allCountryNames: string[];
   continentNames: readonly ContinentName[];
@@ -31,11 +34,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   toggleOffice,
   toggleAllOffices,
   selectedCountries,
+  highlightedCountries,
   selectedContinents,
   showCountryLabels,
   onToggleCountryLabels,
   addCountry,
   removeCountry,
+  toggleCountryHighlight,
   toggleContinent,
   allCountryNames,
   continentNames
@@ -355,16 +360,42 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {selectedCountries.map(name => (
-                      <button 
-                        key={name}
-                        onClick={() => removeCountry(name)}
-                        className="flex items-center gap-2 bg-[#009681] text-white border border-transparent px-4 py-2.5 rounded-full text-[16px] hover:bg-[#009681]/10 hover:text-[#009681] hover:border-[#009681]/20 transition-all group shadow-sm active:scale-95"
-                      >
-                        {name}
-                        <svg className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                      </button>
-                    ))}
+                    {selectedCountries.map(name => {
+                      const isHighlighted = highlightedCountries.includes(name);
+
+                      return (
+                        <div
+                          key={name}
+                          className="inline-flex min-h-10 max-w-full items-center rounded-full border border-transparent bg-[#009681] text-white shadow-sm transition-colors hover:bg-[#007f6e]"
+                        >
+                          <button
+                            type="button"
+                            aria-label={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
+                            aria-pressed={isHighlighted}
+                            title={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
+                            onClick={() => toggleCountryHighlight(name)}
+                            className={`ml-1.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+                              isHighlighted ? 'bg-white/[0.18] text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            <Star
+                              size={16}
+                              strokeWidth={1.8}
+                              fill={isHighlighted ? 'currentColor' : 'none'}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeCountry(name)}
+                            className="group flex min-h-10 min-w-0 items-center gap-2 py-2 pr-4 pl-1 text-[16px] active:scale-[0.98]"
+                            aria-label={`Remove ${name}`}
+                          >
+                            <span className="min-w-0 break-words text-left leading-tight">{name}</span>
+                            <X size={14} strokeWidth={2.4} className="flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
