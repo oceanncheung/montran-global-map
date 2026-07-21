@@ -37,6 +37,29 @@ const BOTTOM_CLEARANCE = 72;
 const LABEL_VIEWPORT_PADDING = 16;
 const LABEL_VIEWPORT_TOP = 112;
 const LABEL_VIEWPORT_BOTTOM = 88;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const EXPORT_FONT_FAMILY = 'Source Sans 3 Export';
+
+let exportFontDataUrlPromise: Promise<string | null> | null = null;
+
+const getExportFontDataUrl = () => {
+  if (!exportFontDataUrlPromise) {
+    exportFontDataUrlPromise = fetch('/fonts/source-sans-3-regular.ttf')
+      .then((response) => {
+        if (!response.ok) throw new Error(`Unable to load export font (${response.status})`);
+        return response.blob();
+      })
+      .then((fontBlob) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(fontBlob);
+      }))
+      .catch(() => null);
+  }
+
+  return exportFontDataUrlPromise;
+};
 
 const DEFAULT_VIEW_FRAME = {
   open: {
@@ -323,7 +346,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     }
   };
 
-  const getCleanSVGClone = () => {
+  const getCleanSVGClone = async () => {
     if (!svgRef.current) return null;
     const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
     const innerGroup = clone.querySelector<SVGGElement>('[data-map-world]');
@@ -339,11 +362,30 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     clone.setAttribute('width', String(width));
     clone.setAttribute('height', String(height));
     clone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+
+    const fontDataUrl = await getExportFontDataUrl();
+    const exportFontStack = fontDataUrl
+      ? `'${EXPORT_FONT_FAMILY}', Arial, sans-serif`
+      : 'Arial, sans-serif';
+
+    if (fontDataUrl) {
+      const defs = clone.querySelector('defs') ?? document.createElementNS(SVG_NAMESPACE, 'defs');
+      if (!defs.parentNode) clone.prepend(defs);
+      const style = document.createElementNS(SVG_NAMESPACE, 'style');
+      style.textContent = `@font-face { font-family: '${EXPORT_FONT_FAMILY}'; src: url('${fontDataUrl}') format('truetype'); font-style: normal; font-weight: 400; }`;
+      defs.prepend(style);
+    }
+
+    clone.querySelectorAll<SVGTextElement>('[data-country-label] text').forEach((text) => {
+      text.setAttribute('font-family', exportFontStack);
+      text.setAttribute('style', `font-family: ${exportFontStack}; font-weight: 400;`);
+    });
+
     return clone;
   };
 
-  const exportSVG = () => {
-    const clone = getCleanSVGClone();
+  const exportSVG = async () => {
+    const clone = await getCleanSVGClone();
     if (!clone) return;
     const svgData = new XMLSerializer().serializeToString(clone);
     const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
@@ -355,8 +397,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const exportPNG = (scale: number) => {
-    const clone = getCleanSVGClone();
+  const exportPNG = async (scale: number) => {
+    const clone = await getCleanSVGClone();
     if (!clone) return;
     const svgData = new XMLSerializer().serializeToString(clone);
     const canvas = document.createElement("canvas");

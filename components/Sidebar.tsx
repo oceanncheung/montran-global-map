@@ -41,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   continentNames
 }) => {
   const [countrySearch, setCountrySearch] = useState('');
+  const [activeCountryIndex, setActiveCountryIndex] = useState(0);
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Corporate HQ']);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const countrySearchInputRef = useRef<HTMLInputElement>(null);
@@ -107,11 +108,15 @@ const Sidebar: React.FC<SidebarProps> = ({
       )
       .slice(0, 8);
   }, [countrySearch, allCountryNames, selectedCountries]);
+  const highlightedCountryIndex = filteredCountries.length > 0
+    ? Math.min(activeCountryIndex, filteredCountries.length - 1)
+    : 0;
 
   const selectSearchedCountry = (name: string) => {
     const input = countrySearchInputRef.current;
     addCountry(name);
     setCountrySearch('');
+    setActiveCountryIndex(0);
     if (input) input.value = '';
     window.requestAnimationFrame(() => {
       if (!input) return;
@@ -121,12 +126,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleCountrySearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    if (event.nativeEvent.isComposing) return;
 
-    const normalizedSearch = countrySearch.trim().toLowerCase();
-    const countryToSelect = filteredCountries.find(
-      name => name.toLowerCase() === normalizedSearch
-    ) ?? filteredCountries[0];
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (filteredCountries.length === 0) return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      setActiveCountryIndex((current) => (
+        (Math.min(current, filteredCountries.length - 1) + direction + filteredCountries.length) %
+        filteredCountries.length
+      ));
+      return;
+    }
+
+    if (event.key !== 'Enter') return;
+
+    const countryToSelect = filteredCountries[highlightedCountryIndex] ?? filteredCountries[0];
 
     if (!countryToSelect) return;
 
@@ -288,19 +303,43 @@ const Sidebar: React.FC<SidebarProps> = ({
                       type="text" 
                       placeholder="Search countries..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-display-9 focus:ring-4 focus:ring-[#009681]/5 focus:border-[#009681] outline-none transition-all placeholder:text-slate-300 hover:bg-white focus:bg-white"
-                      onChange={(e) => setCountrySearch(e.target.value)}
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-controls="country-search-results"
+                      aria-expanded={filteredCountries.length > 0}
+                      aria-activedescendant={filteredCountries.length > 0
+                        ? `country-search-option-${highlightedCountryIndex}`
+                        : undefined}
+                      onChange={(e) => {
+                        setCountrySearch(e.target.value);
+                        setActiveCountryIndex(0);
+                      }}
                       onKeyDown={handleCountrySearchKeyDown}
                     />
                     {filteredCountries.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 overflow-hidden">
-                        {filteredCountries.map(name => (
-                          <div 
+                      <div
+                        id="country-search-results"
+                        role="listbox"
+                        className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-xl shadow-2xl z-30 overflow-hidden"
+                      >
+                        {filteredCountries.map((name, index) => (
+                          <button
                             key={name}
+                            id={`country-search-option-${index}`}
+                            type="button"
+                            role="option"
+                            aria-selected={index === highlightedCountryIndex}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveCountryIndex(index)}
                             onClick={() => selectSearchedCountry(name)}
-                            className="px-5 py-4 text-display-9 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 text-slate-700"
+                            className={`block w-full px-5 py-4 text-left text-display-9 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${
+                              index === highlightedCountryIndex
+                                ? 'bg-[#009681]/10 text-[#007a69]'
+                                : 'bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
                           >
                             {name}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
