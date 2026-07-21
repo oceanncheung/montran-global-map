@@ -100,12 +100,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const filteredCountries = useMemo(() => {
-    if (!countrySearch) return [];
+    const normalizedSearch = countrySearch.trim().toLowerCase();
+    if (!normalizedSearch) return [];
+    const getMatchRank = (name: string) => {
+      const normalizedName = name.toLowerCase();
+      if (normalizedName === normalizedSearch) return 0;
+      if (normalizedName.startsWith(normalizedSearch)) return 1;
+      return 2;
+    };
+
     return allCountryNames
-      .filter(name => 
-        name.toLowerCase().includes(countrySearch.toLowerCase()) && 
+      .filter(name =>
+        name.toLowerCase().includes(normalizedSearch) &&
         !selectedCountries.includes(name)
       )
+      .sort((a, b) => getMatchRank(a) - getMatchRank(b) || a.localeCompare(b))
       .slice(0, 8);
   }, [countrySearch, allCountryNames, selectedCountries]);
   const highlightedCountryIndex = filteredCountries.length > 0

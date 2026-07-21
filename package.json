@@ -14,11 +14,13 @@
   "dependencies": {
     "d3": "^7.9.0",
     "express": "^5.1.0",
+    "opentype.js": "^1.3.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/opentype.js": "^1.3.10",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.5.4",
     "postcss": "^8.5.20",

@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
+import type { Font } from 'opentype.js';
 import { geoToPixel } from '../utils/geo';
 import { OfficeLocation } from '../types';
 import { MAP_DOTS, MONTRAN_OFFICES } from '../constants';
@@ -38,27 +39,39 @@ const LABEL_VIEWPORT_PADDING = 16;
 const LABEL_VIEWPORT_TOP = 112;
 const LABEL_VIEWPORT_BOTTOM = 88;
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
-const EXPORT_FONT_FAMILY = 'Source Sans 3 Export';
 
-let exportFontDataUrlPromise: Promise<string | null> | null = null;
+let countryLabelFontPromise: Promise<Font> | null = null;
 
-const getExportFontDataUrl = () => {
-  if (!exportFontDataUrlPromise) {
-    exportFontDataUrlPromise = fetch('/fonts/source-sans-3-regular.ttf')
-      .then((response) => {
-        if (!response.ok) throw new Error(`Unable to load export font (${response.status})`);
-        return response.blob();
-      })
-      .then((fontBlob) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(fontBlob);
-      }))
-      .catch(() => null);
+const getCountryLabelFont = () => {
+  if (!countryLabelFontPromise) {
+    countryLabelFontPromise = Promise.all([
+      import('opentype.js'),
+      fetch('/fonts/source-sans-3-regular.ttf').then((response) => {
+        if (!response.ok) throw new Error(`Unable to load country label font (${response.status})`);
+        return response.arrayBuffer();
+      }),
+    ]).then(([opentype, fontBuffer]) => opentype.parse(fontBuffer));
   }
 
-  return exportFontDataUrlPromise;
+  return countryLabelFontPromise;
+};
+
+const createCountryLabelGlyphPath = (
+  font: Font,
+  text: string,
+  x: number,
+  textAnchor: 'start' | 'end',
+) => {
+  const renderOptions = { kerning: true };
+  const advanceWidth = font.getAdvanceWidth(text, COUNTRY_LABEL_FONT_SIZE, renderOptions);
+  const startX = textAnchor === 'end' ? x - advanceWidth : x;
+  const baselineY = 0.5 + (
+    (font.ascender + font.descender) / font.unitsPerEm
+  ) * COUNTRY_LABEL_FONT_SIZE / 2;
+
+  return font
+    .getPath(text, startX, baselineY, COUNTRY_LABEL_FONT_SIZE, renderOptions)
+    .toPathData(3);
 };
 
 const DEFAULT_VIEW_FRAME = {
@@ -96,6 +109,17 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [countryLabelFont, setCountryLabelFont] = useState<Font | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCountryLabelFont().then((font) => {
+      if (isMounted) setCountryLabelFont(font);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Derived set of indices to highlight based on sidebar selection
   const activeDotIndices = useMemo(() => {
@@ -363,22 +387,19 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     clone.setAttribute('height', String(height));
     clone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
 
-    const fontDataUrl = await getExportFontDataUrl();
-    const exportFontStack = fontDataUrl
-      ? `'${EXPORT_FONT_FAMILY}', Arial, sans-serif`
-      : 'Arial, sans-serif';
-
-    if (fontDataUrl) {
-      const defs = clone.querySelector('defs') ?? document.createElementNS(SVG_NAMESPACE, 'defs');
-      if (!defs.parentNode) clone.prepend(defs);
-      const style = document.createElementNS(SVG_NAMESPACE, 'style');
-      style.textContent = `@font-face { font-family: '${EXPORT_FONT_FAMILY}'; src: url('${fontDataUrl}') format('truetype'); font-style: normal; font-weight: 400; }`;
-      defs.prepend(style);
-    }
-
+    const font = await getCountryLabelFont();
     clone.querySelectorAll<SVGTextElement>('[data-country-label] text').forEach((text) => {
-      text.setAttribute('font-family', exportFontStack);
-      text.setAttribute('style', `font-family: ${exportFontStack}; font-weight: 400;`);
+      const glyphPath = document.createElementNS(SVG_NAMESPACE, 'path');
+      const textAnchor = text.getAttribute('text-anchor') === 'end' ? 'end' : 'start';
+      glyphPath.setAttribute('d', createCountryLabelGlyphPath(
+        font,
+        text.textContent ?? '',
+        Number(text.getAttribute('x') ?? 0),
+        textAnchor,
+      ));
+      glyphPath.setAttribute('fill', text.getAttribute('fill') ?? '#24423d');
+      glyphPath.setAttribute('data-country-label-glyphs', 'true');
+      text.replaceWith(glyphPath);
     });
 
     return clone;
@@ -599,6 +620,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               const anchorTransform = `translate(${label.anchor.x} ${label.anchor.y})`;
               const labelTransform = `${anchorTransform} scale(${baseLabelScale})`;
               const mirrorPill = label.side === 'left';
+              const textX = mirrorPill ? label.width / 2 - 25 : -label.width / 2 + 25;
+              const textAnchor = mirrorPill ? 'end' : 'start';
+              const glyphPath = countryLabelFont
+                ? createCountryLabelGlyphPath(countryLabelFont, label.name, textX, textAnchor)
+                : null;
 
               return (
                 <g
@@ -631,19 +657,27 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                       r="3.5"
                       fill="#009681"
                     />
-                    <text
-                      x={mirrorPill ? label.width / 2 - 25 : -label.width / 2 + 25}
-                      y="0.5"
-                      fill="#24423d"
-                      fontFamily="Source Sans 3, sans-serif"
-                      fontSize={COUNTRY_LABEL_FONT_SIZE}
-                      fontWeight="400"
-                      letterSpacing="0"
-                      dominantBaseline="middle"
-                      textAnchor={mirrorPill ? 'end' : 'start'}
-                    >
-                      {label.name}
-                    </text>
+                    {glyphPath ? (
+                      <path
+                        d={glyphPath}
+                        fill="#24423d"
+                        data-country-label-glyphs="true"
+                      />
+                    ) : (
+                      <text
+                        x={textX}
+                        y="0.5"
+                        fill="#24423d"
+                        fontFamily="Source Sans 3, sans-serif"
+                        fontSize={COUNTRY_LABEL_FONT_SIZE}
+                        fontWeight="400"
+                        letterSpacing="0"
+                        dominantBaseline="middle"
+                        textAnchor={textAnchor}
+                      >
+                        {label.name}
+                      </text>
+                    )}
                   </g>
                 </g>
               );
