@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MapPoint } from '../types';
 import { COUNTRY_NAMES, MANUAL_MAPPINGS, MAP_DOTS } from './mappings';
 import {
+  COUNTRY_LABEL_CORNER_RADIUS,
   COUNTRY_LABEL_LEADER_CLEARANCE,
   COUNTRY_LABEL_MIN_PILL_APPROACH,
   COUNTRY_LABEL_ROUTE_SEPARATION,
@@ -199,19 +200,77 @@ const expectNoLeaderOverlaps = (labels: CountryLabelLayout[], scale: number) => 
     for (let second = first + 1; second < leaders.length; second += 1) {
       for (let firstSegment = 1; firstSegment < leaders[first].points.length; firstSegment += 1) {
         for (let secondSegment = 1; secondSegment < leaders[second].points.length; secondSegment += 1) {
+          const overlaps = segmentsOverlap(
+            leaders[first].points[firstSegment - 1],
+            leaders[first].points[firstSegment],
+            leaders[second].points[secondSegment - 1],
+            leaders[second].points[secondSegment],
+          );
+          const isIntentionalBundleTrunk = Boolean(
+            leaders[first].label.leaderBundleId &&
+            leaders[first].label.leaderBundleId === leaders[second].label.leaderBundleId &&
+            leaders[first].label.leaderBundleSegmentIndex === firstSegment - 1 &&
+            leaders[second].label.leaderBundleSegmentIndex === secondSegment - 1 &&
+            Math.abs(
+              leaders[first].points[firstSegment - 1].x -
+              leaders[first].points[firstSegment].x,
+            ) < 0.001 &&
+            Math.abs(
+              leaders[second].points[secondSegment - 1].x -
+              leaders[second].points[secondSegment].x,
+            ) < 0.001,
+          );
           expect(
-            segmentsOverlap(
-              leaders[first].points[firstSegment - 1],
-              leaders[first].points[firstSegment],
-              leaders[second].points[secondSegment - 1],
-              leaders[second].points[secondSegment],
-            ),
+            overlaps && !isIntentionalBundleTrunk,
             `${leaders[first].label.name} leader overlaps ${leaders[second].label.name}`,
           ).toBe(false);
         }
       }
     }
   }
+};
+
+const expectBundledLeadersHaveSeparatedBranches = (
+  labels: CountryLabelLayout[],
+  scale: number,
+) => {
+  const bundles = new Map<string, CountryLabelLayout[]>();
+  labels.forEach((label) => {
+    if (!label.leaderBundleId) return;
+    bundles.set(label.leaderBundleId, [
+      ...(bundles.get(label.leaderBundleId) ?? []),
+      label,
+    ]);
+  });
+
+  bundles.forEach((bundle) => {
+    expect(bundle.length).toBeGreaterThanOrEqual(2);
+    const trunkXs = new Set<number>();
+    bundle.forEach((label) => {
+      expect(label.leaderBundleSize).toBe(bundle.length);
+      const points = getAbsoluteLeaderPoints(label, scale);
+      const segmentIndex = label.leaderBundleSegmentIndex!;
+      expect(segmentIndex).toBeGreaterThan(0);
+      expect(segmentIndex).toBeLessThan(points.length - 2);
+      const previous = points[segmentIndex - 1];
+      const start = points[segmentIndex];
+      const end = points[segmentIndex + 1];
+      const next = points[segmentIndex + 2];
+      expect(Math.abs(start.x - end.x)).toBeLessThan(0.001);
+      expect(Math.abs(previous.y - start.y)).toBeLessThan(0.001);
+      expect(Math.abs(end.y - next.y)).toBeLessThan(0.001);
+      expect(Math.abs(start.x - previous.x)).toBeGreaterThanOrEqual(
+        COUNTRY_LABEL_CORNER_RADIUS * 2 + 2,
+      );
+      expect(Math.abs(next.x - end.x)).toBeGreaterThanOrEqual(
+        COUNTRY_LABEL_CORNER_RADIUS * 2 + 2,
+      );
+      trunkXs.add(Number(start.x.toFixed(3)));
+    });
+    expect(trunkXs.size).toBe(1);
+  });
+
+  return bundles;
 };
 
 const distanceFromPointToSegment = (point: MapPoint, start: MapPoint, end: MapPoint) => {
@@ -504,6 +563,12 @@ describe('country label composition', () => {
     expect(composition.labels).toHaveLength(PACIFIC_COUNTRIES.length);
     expectNoPillOverlaps(composition.labels);
     expectNoLeaderOverlaps(composition.labels, options.placementScale);
+    expect(
+      expectBundledLeadersHaveSeparatedBranches(
+        composition.labels,
+        options.placementScale,
+      ).size,
+    ).toBeGreaterThan(0);
     expectLeadersAvoidSelectedDots(
       composition.labels,
       selectedDotIndexes,

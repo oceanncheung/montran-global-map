@@ -47,6 +47,9 @@ export interface CountryLabelLayout {
   side?: CountryLabelSide;
   railIndex?: number;
   leaderPoints?: MapPoint[];
+  leaderBundleId?: string;
+  leaderBundleSize?: number;
+  leaderBundleSegmentIndex?: number;
 }
 
 export interface CountryLabelComposition {
@@ -127,6 +130,8 @@ const ROUTING_PORT_MIN_SEPARATION = COUNTRY_LABEL_ROUTE_SEPARATION + 1;
 const MIN_DOT_DEPARTURE = 12;
 const STRAIGHT_ALIGNMENT_TOLERANCE = 0.5;
 const BENT_ROUTE_PENALTY = 64;
+const LEADER_BUNDLE_MAX_DISTANCE = ROUTING_LANE_GAP * 2;
+const LEADER_BUNDLE_MIN_OVERLAP = COUNTRY_LABEL_HEIGHT * 0.75;
 const COUNTRY_LABEL_EXPORT_PADDING = 14;
 const COUNTRY_LABEL_LEADER_EXPORT_PADDING = 2;
 
@@ -1836,6 +1841,209 @@ const resolveLeaderOverlaps = (
   return result;
 };
 
+const bundleNearbyVerticalLeaders = (
+  layouts: CountryLabelLayout[],
+  scale: number,
+  dotObstacles: DotObstacleIndex,
+) => {
+  type Candidate = {
+    layoutIndex: number;
+    name: string;
+    side: CountryLabelSide;
+    segmentIndex: number;
+    x: number;
+    top: number;
+    bottom: number;
+  };
+  const result = [...layouts];
+  const isHorizontal = (start: MapPoint, end: MapPoint) => (
+    Math.abs(start.y - end.y) < 0.001 && Math.abs(start.x - end.x) > 0.001
+  );
+  const isVertical = (start: MapPoint, end: MapPoint) => (
+    Math.abs(start.x - end.x) < 0.001 && Math.abs(start.y - end.y) > 0.001
+  );
+  const getOverlap = (first: Candidate, second: Candidate) => (
+    Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top)
+  );
+  const getCandidate = (layout: CountryLabelLayout, layoutIndex: number) => {
+    if (!layout.side || !layout.leaderPoints) return null;
+    const points = getAbsoluteLeaderPoints(layout, scale);
+    const candidates: Candidate[] = [];
+    for (let segmentIndex = 1; segmentIndex < points.length - 2; segmentIndex += 1) {
+      const start = points[segmentIndex];
+      const end = points[segmentIndex + 1];
+      if (
+        !isHorizontal(points[segmentIndex - 1], start) ||
+        !isVertical(start, end) ||
+        !isHorizontal(end, points[segmentIndex + 2])
+      ) continue;
+      const top = Math.min(start.y, end.y);
+      const bottom = Math.max(start.y, end.y);
+      if (bottom - top < LEADER_BUNDLE_MIN_OVERLAP) continue;
+      candidates.push({
+        layoutIndex,
+        name: layout.name,
+        side: layout.side,
+        segmentIndex,
+        x: start.x,
+        top,
+        bottom,
+      });
+    }
+    return candidates.sort((first, second) => (
+      (second.bottom - second.top) - (first.bottom - first.top) ||
+      first.segmentIndex - second.segmentIndex
+    ))[0] ?? null;
+  };
+  const snapToTrunk = (candidate: Candidate, targetX: number) => {
+    const layout = result[candidate.layoutIndex];
+    const points = getAbsoluteLeaderPoints(layout, scale);
+    const start = points[candidate.segmentIndex];
+    const end = points[candidate.segmentIndex + 1];
+    const previous = points[candidate.segmentIndex - 1];
+    const next = points[candidate.segmentIndex + 2];
+    const originalEntry = start.x - previous.x;
+    const originalExit = next.x - end.x;
+    const bundledEntry = targetX - previous.x;
+    const bundledExit = next.x - targetX;
+    if (
+      Math.abs(bundledEntry) < MIN_DOT_DEPARTURE ||
+      Math.abs(bundledExit) < COUNTRY_LABEL_MIN_PILL_APPROACH ||
+      originalEntry * bundledEntry <= 0 ||
+      originalExit * bundledExit <= 0
+    ) return null;
+    const bundledPoints = points.map((point, pointIndex) => (
+      pointIndex === candidate.segmentIndex || pointIndex === candidate.segmentIndex + 1
+        ? { ...point, x: targetX }
+        : point
+    ));
+    return {
+      ...layout,
+      leaderPoints: bundledPoints.map((point) => ({
+        x: point.x - layout.anchor.x * scale,
+        y: point.y - layout.anchor.y * scale,
+      })),
+    };
+  };
+  const routeIsSafe = (
+    candidate: Candidate,
+    layout: CountryLabelLayout,
+    memberIndexes: Set<number>,
+  ) => {
+    const points = getAbsoluteLeaderPoints(layout, scale);
+    const original = result[candidate.layoutIndex];
+    if (
+      getRouteDotCollisionCount(points, dotObstacles, layout.anchorDotIndex) >
+      getRouteDotCollisionCount(
+        getAbsoluteLeaderPoints(original, scale),
+        dotObstacles,
+        original.anchorDotIndex,
+      )
+    ) return false;
+    for (let otherIndex = 0; otherIndex < result.length; otherIndex += 1) {
+      if (otherIndex === candidate.layoutIndex) continue;
+      if (routeIntersectsRect(
+        points,
+        result[otherIndex].rect,
+        COUNTRY_LABEL_LEADER_CLEARANCE,
+      )) return false;
+      if (memberIndexes.has(otherIndex)) continue;
+      const otherPoints = getAbsoluteLeaderPoints(result[otherIndex], scale);
+      if (otherPoints.length > 1 && routesOverlap(points, otherPoints)) return false;
+    }
+    return true;
+  };
+  const pairOnlySharesTrunk = (
+    first: Candidate,
+    firstLayout: CountryLabelLayout,
+    second: Candidate,
+    secondLayout: CountryLabelLayout,
+  ) => {
+    const firstPoints = getAbsoluteLeaderPoints(firstLayout, scale);
+    const secondPoints = getAbsoluteLeaderPoints(secondLayout, scale);
+    if (getOverlap(first, second) < LEADER_BUNDLE_MIN_OVERLAP) return false;
+    for (let firstIndex = 1; firstIndex < firstPoints.length; firstIndex += 1) {
+      for (let secondIndex = 1; secondIndex < secondPoints.length; secondIndex += 1) {
+        if (!segmentsOverlap(
+          firstPoints[firstIndex - 1],
+          firstPoints[firstIndex],
+          secondPoints[secondIndex - 1],
+          secondPoints[secondIndex],
+        )) continue;
+        const isSharedTrunk = firstIndex - 1 === first.segmentIndex &&
+          secondIndex - 1 === second.segmentIndex &&
+          isVertical(firstPoints[firstIndex - 1], firstPoints[firstIndex]) &&
+          isVertical(secondPoints[secondIndex - 1], secondPoints[secondIndex]) &&
+          Math.abs(firstPoints[firstIndex].x - secondPoints[secondIndex].x) < 0.001;
+        if (!isSharedTrunk) return false;
+      }
+    }
+    return true;
+  };
+
+  const candidates = result
+    .map(getCandidate)
+    .filter((candidate): candidate is Candidate => candidate !== null);
+  const pairs = candidates.flatMap((first, firstIndex) => (
+    candidates.slice(firstIndex + 1)
+      .filter((second) => (
+        first.side === second.side &&
+        Math.abs(first.x - second.x) <= LEADER_BUNDLE_MAX_DISTANCE &&
+        getOverlap(first, second) >= LEADER_BUNDLE_MIN_OVERLAP
+      ))
+      .map((second) => ({ first, second }))
+  )).sort((a, b) => (
+    Math.abs(a.first.x - a.second.x) - Math.abs(b.first.x - b.second.x) ||
+    getOverlap(b.first, b.second) - getOverlap(a.first, a.second) ||
+    a.first.name.localeCompare(b.first.name) ||
+    a.second.name.localeCompare(b.second.name)
+  ));
+  const bundledIndexes = new Set<number>();
+
+  pairs.forEach(({ first, second }) => {
+    if (bundledIndexes.has(first.layoutIndex) || bundledIndexes.has(second.layoutIndex)) return;
+    const memberIndexes = new Set([first.layoutIndex, second.layoutIndex]);
+    const targetXs = [first.x, second.x]
+      .filter((targetX, index, targets) => targets.indexOf(targetX) === index)
+      .sort((a, b) => a - b);
+
+    for (const targetX of targetXs) {
+      const firstLayout = snapToTrunk(first, targetX);
+      const secondLayout = snapToTrunk(second, targetX);
+      if (
+        !firstLayout ||
+        !secondLayout ||
+        !routeIsSafe(first, firstLayout, memberIndexes) ||
+        !routeIsSafe(second, secondLayout, memberIndexes) ||
+        !pairOnlySharesTrunk(first, firstLayout, second, secondLayout)
+      ) continue;
+      const bundleId = [
+        'leader-bundle',
+        first.side,
+        targetX.toFixed(2),
+        Math.min(first.top, second.top).toFixed(2),
+      ].join('-');
+      result[first.layoutIndex] = {
+        ...firstLayout,
+        leaderBundleId: bundleId,
+        leaderBundleSize: 2,
+        leaderBundleSegmentIndex: first.segmentIndex,
+      };
+      result[second.layoutIndex] = {
+        ...secondLayout,
+        leaderBundleId: bundleId,
+        leaderBundleSize: 2,
+        leaderBundleSegmentIndex: second.segmentIndex,
+      };
+      bundledIndexes.add(first.layoutIndex);
+      bundledIndexes.add(second.layoutIndex);
+      break;
+    }
+  });
+
+  return result;
+};
+
 const getLineCommand = (from: MapPoint, to: MapPoint) => {
   if (Math.abs(from.y - to.y) < 0.001) return `H ${to.x}`;
   if (Math.abs(from.x - to.x) < 0.001) return `V ${to.y}`;
@@ -2022,7 +2230,12 @@ export const createCountryLabelComposition = (
     scale,
     dotObstacles,
   );
-  const labels = resolveLeaderOverlaps(dotClearedLayouts, scale, dotObstacles)
+  const separatedLayouts = resolveLeaderOverlaps(dotClearedLayouts, scale, dotObstacles);
+  const labels = (
+    separatedLayouts.length <= DENSE_SELECTION_THRESHOLD
+      ? bundleNearbyVerticalLeaders(separatedLayouts, scale, dotObstacles)
+      : separatedLayouts
+  )
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return {

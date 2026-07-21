@@ -739,6 +739,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                 <g
                   key={`leader-${label.name}`}
                   data-country-leader={label.name}
+                  data-leader-bundle={label.leaderBundleId}
+                  data-leader-bundle-size={label.leaderBundleSize}
                   data-export-transform={labelTransform}
                   transform={labelTransform}
                 >
@@ -749,7 +751,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     strokeWidth="1.25"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    opacity="0.5"
+                    opacity={label.leaderBundleId ? 0.4 : 0.5}
                   />
                 </g>
               );
