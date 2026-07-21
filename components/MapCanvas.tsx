@@ -58,6 +58,7 @@ const LABEL_VIEWPORT_TOP = 112;
 const LABEL_VIEWPORT_BOTTOM = 88;
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const COUNTRY_LABEL_COMPOSITION_CACHE_LIMIT = 8;
+const COUNTRY_LABEL_RENDER_OPTIONS = { kerning: true } as const;
 
 let countryLabelFontPromise: Promise<Font> | null = null;
 
@@ -81,15 +82,18 @@ const createCountryLabelGlyphPath = (
   x: number,
   textAnchor: 'start' | 'end',
 ) => {
-  const renderOptions = { kerning: true };
-  const advanceWidth = font.getAdvanceWidth(text, COUNTRY_LABEL_FONT_SIZE, renderOptions);
+  const advanceWidth = font.getAdvanceWidth(
+    text,
+    COUNTRY_LABEL_FONT_SIZE,
+    COUNTRY_LABEL_RENDER_OPTIONS,
+  );
   const startX = textAnchor === 'end' ? x - advanceWidth : x;
   const baselineY = 0.5 + (
     (font.ascender + font.descender) / font.unitsPerEm
   ) * COUNTRY_LABEL_FONT_SIZE / 2;
 
   return font
-    .getPath(text, startX, baselineY, COUNTRY_LABEL_FONT_SIZE, renderOptions)
+    .getPath(text, startX, baselineY, COUNTRY_LABEL_FONT_SIZE, COUNTRY_LABEL_RENDER_OPTIONS)
     .toPathData(3);
 };
 
@@ -113,11 +117,13 @@ const createCountryLabelCompositionCacheKey = (
   placementScale: number,
   placementBounds: CountryLabelPlacementBounds | null,
   viewportHeight: number,
+  hasExactFontMetrics: boolean,
 ) => JSON.stringify([
   Array.from(new Set(countryNames)).sort((a, b) => a.localeCompare(b)),
   placementScale,
   placementBounds,
   viewportHeight,
+  hasExactFontMetrics,
 ]);
 
 interface MapGridDotsProps {
@@ -220,6 +226,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const labelObstacleDotIndexes = useMemo(() => (
     Array.from(individuallySelectedDotIndices).sort((a, b) => a - b)
   ), [individuallySelectedDotIndices]);
+  const measureCountryLabelText = useMemo(() => (
+    countryLabelFont
+      ? (name: string) => countryLabelFont.getAdvanceWidth(
+        name,
+        COUNTRY_LABEL_FONT_SIZE,
+        COUNTRY_LABEL_RENDER_OPTIONS,
+      )
+      : undefined
+  ), [countryLabelFont]);
 
   const allOfficeMarkers = useMemo(() => {
     const dotsWithIndices = MAP_DOTS.map((dot, index) => ({ ...dot, index }));
@@ -318,11 +333,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     placementBounds: baseLabelPlacementBounds,
     viewportHeight: Math.max(viewportSize.height, 1),
     obstacleDotIndexes: labelObstacleDotIndexes,
+    measureLabelText: measureCountryLabelText,
   }), [
     baseDefaultTransform.k,
     baseLabelPlacementBounds,
     viewportSize.height,
     labelObstacleDotIndexes,
+    measureCountryLabelText,
   ]);
 
   const countryLabelCompositionCacheKey = useMemo(() => (
@@ -331,8 +348,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       countryLabelCompositionOptions.placementScale,
       countryLabelCompositionOptions.placementBounds,
       countryLabelCompositionOptions.viewportHeight,
+      Boolean(measureCountryLabelText),
     )
-  ), [individuallySelectedCountries, countryLabelCompositionOptions]);
+  ), [
+    individuallySelectedCountries,
+    countryLabelCompositionOptions,
+    measureCountryLabelText,
+  ]);
 
   const hiddenCountryLabelComposition = useMemo(() => createCountryLabelComposition(
     [],

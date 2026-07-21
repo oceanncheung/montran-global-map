@@ -2,6 +2,7 @@ import { MapPoint } from '../types';
 
 export const COUNTRY_LABEL_HEIGHT = 32;
 export const COUNTRY_LABEL_FONT_SIZE = 16;
+export const COUNTRY_LABEL_HORIZONTAL_PADDING = 40;
 export const COUNTRY_LABEL_ROW_GAP = 8;
 export const COUNTRY_LABEL_ROW_PITCH = COUNTRY_LABEL_HEIGHT + COUNTRY_LABEL_ROW_GAP;
 export const COUNTRY_LABEL_CORNER_RADIUS = 6;
@@ -60,6 +61,7 @@ export interface CountryLabelCompositionOptions {
   placementBounds?: CountryLabelPlacementBounds | null;
   viewportHeight: number;
   obstacleDotIndexes?: readonly number[];
+  measureLabelText?: (name: string) => number;
 }
 
 interface CountryFootprint {
@@ -208,8 +210,12 @@ const getCharacterWidth = (character: string) => {
   return 7.7;
 };
 
-export const estimateCountryLabelWidth = (name: string) => (
-  Math.ceil(Array.from(name).reduce((width, character) => width + getCharacterWidth(character), 0) + 40)
+const estimateCountryLabelTextWidth = (name: string) => (
+  Array.from(name).reduce((width, character) => width + getCharacterWidth(character), 0)
+);
+
+export const estimateCountryLabelWidth = (name: string) => Math.ceil(
+  estimateCountryLabelTextWidth(name) + COUNTRY_LABEL_HORIZONTAL_PADDING,
 );
 
 const distanceBetween = (a: MapPoint, b: MapPoint) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -257,6 +263,7 @@ const getCountryFootprint = (
   name: string,
   indexes: number[],
   mapDots: MapPoint[],
+  measureLabelText?: (name: string) => number,
 ): CountryFootprint | null => {
   const componentIndexes = getLargestConnectedComponent(indexes, mapDots);
   if (componentIndexes.length === 0) return null;
@@ -282,7 +289,10 @@ const getCountryFootprint = (
     maxY,
     width: maxX - minX,
     height: maxY - minY,
-    labelWidth: estimateCountryLabelWidth(name),
+    labelWidth: Math.ceil(
+      (measureLabelText?.(name) ?? estimateCountryLabelTextWidth(name)) +
+      COUNTRY_LABEL_HORIZONTAL_PADDING,
+    ),
   };
 };
 
@@ -1889,7 +1899,12 @@ export const createCountryLabelComposition = (
   const visibleBounds = options.placementBounds ?? getMapBounds(mapDots, scale);
   const uniqueNames = Array.from(new Set(countryNames)).sort((a, b) => a.localeCompare(b));
   const footprints = uniqueNames
-    .map((name) => getCountryFootprint(name, mappings[name] ?? [], mapDots))
+    .map((name) => getCountryFootprint(
+      name,
+      mappings[name] ?? [],
+      mapDots,
+      options.measureLabelText,
+    ))
     .filter((footprint): footprint is CountryFootprint => Boolean(footprint));
 
   if (footprints.length === 0) {

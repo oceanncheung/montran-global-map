@@ -12,6 +12,7 @@ import {
   countryLabelRectsOverlap,
   createCountryLabelComposition,
   createRoundedOrthogonalPath,
+  estimateCountryLabelWidth,
 } from './countryLabels';
 
 const EXACT_COUNTRIES = [
@@ -335,6 +336,22 @@ describe('country label composition', () => {
     expect(composition.labels[0].placement).toBe('floating');
     expect(composition.labels[0].leaderPoints?.length).toBeGreaterThanOrEqual(2);
     expectAxisAlignedRoutes(composition.labels);
+  });
+
+  it('uses exact font metrics instead of accumulating width-estimate padding', () => {
+    const name = 'Federated States of Micronesia';
+    const composition = createCountryLabelComposition(
+      [name],
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      {
+        ...getOptions(),
+        measureLabelText: () => 205.98,
+      },
+    );
+
+    expect(estimateCountryLabelWidth(name)).toBe(260);
+    expect(composition.labels[0].width).toBe(246);
   });
 
   it('places two nearby small countries without overlapping their pills', () => {
