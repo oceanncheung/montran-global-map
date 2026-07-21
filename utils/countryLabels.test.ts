@@ -217,6 +217,29 @@ const expectLabelsWithinBounds = (
   });
 };
 
+const expectExportContainsLabels = (
+  labels: CountryLabelLayout[],
+  scale: number,
+  viewBox: { x: number; y: number; width: number; height: number },
+) => {
+  const right = viewBox.x + viewBox.width;
+  const bottom = viewBox.y + viewBox.height;
+
+  labels.forEach((label) => {
+    expect(label.rect.left / scale, `${label.name} export is clipped on the left`).toBeGreaterThanOrEqual(viewBox.x);
+    expect(label.rect.right / scale, `${label.name} export is clipped on the right`).toBeLessThanOrEqual(right);
+    expect(label.rect.top / scale, `${label.name} export is clipped at the top`).toBeGreaterThanOrEqual(viewBox.y);
+    expect(label.rect.bottom / scale, `${label.name} export is clipped at the bottom`).toBeLessThanOrEqual(bottom);
+
+    getAbsoluteLeaderPoints(label, scale).forEach((point) => {
+      expect(point.x / scale, `${label.name} leader export is clipped horizontally`).toBeGreaterThanOrEqual(viewBox.x);
+      expect(point.x / scale, `${label.name} leader export is clipped horizontally`).toBeLessThanOrEqual(right);
+      expect(point.y / scale, `${label.name} leader export is clipped vertically`).toBeGreaterThanOrEqual(viewBox.y);
+      expect(point.y / scale, `${label.name} leader export is clipped vertically`).toBeLessThanOrEqual(bottom);
+    });
+  });
+};
+
 describe('country label composition', () => {
   it('returns the base artboard for an empty selection', () => {
     const composition = createCountryLabelComposition([], MANUAL_MAPPINGS, MAP_DOTS, getOptions());
@@ -279,6 +302,13 @@ describe('country label composition', () => {
     expectLeadersAvoidPills(composition.labels, options.placementScale);
     expectNoLeaderOverlaps(composition.labels, options.placementScale);
     expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
+    expect(composition.exportViewBox.width).toBeGreaterThan(2690);
+    expect(composition.exportViewBox.x + composition.exportViewBox.width / 2).toBe(1375);
+    expectExportContainsLabels(
+      composition.labels,
+      options.placementScale,
+      composition.exportViewBox,
+    );
 
     const nepal = composition.labels.find((label) => label.name === 'Nepal');
     expect(nepal).toBeTruthy();
@@ -319,13 +349,21 @@ describe('country label composition', () => {
     );
 
     expect(composition.labels).toHaveLength(EXACT_COUNTRIES.length);
-    expect(composition.exportViewBox).toEqual({ x: 30, y: 20, width: 2690, height: 1460 });
+    expect(composition.exportViewBox.width).toBeGreaterThanOrEqual(2690);
+    expect(composition.exportViewBox.height).toBeGreaterThanOrEqual(1460);
+    expect(composition.exportViewBox.x + composition.exportViewBox.width / 2).toBe(1375);
+    expect(composition.exportViewBox.y + composition.exportViewBox.height / 2).toBe(750);
     expectNoPillOverlaps(composition.labels);
     expectAxisAlignedRoutes(composition.labels);
     expectLeadersAvoidPills(composition.labels, options.placementScale);
     expectNoLeaderOverlaps(composition.labels, options.placementScale);
     expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
     expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
+    expectExportContainsLabels(
+      composition.labels,
+      options.placementScale,
+      composition.exportViewBox,
+    );
   });
 
   it('separates countries whose anchors are nearly coincident', () => {
@@ -370,6 +408,11 @@ describe('country label composition', () => {
     expectNoLeaderOverlaps(composition.labels, options.placementScale);
     expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
     expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
+    expectExportContainsLabels(
+      composition.labels,
+      options.placementScale,
+      composition.exportViewBox,
+    );
   });
 
   it('rounds orthogonal corners without introducing diagonal segments', () => {

@@ -103,12 +103,63 @@ const ROUTING_PORT_MIN_SEPARATION = COUNTRY_LABEL_ROUTE_SEPARATION + 1;
 const MIN_DOT_DEPARTURE = 12;
 const STRAIGHT_ALIGNMENT_TOLERANCE = 0.5;
 const BENT_ROUTE_PENALTY = 64;
+const COUNTRY_LABEL_EXPORT_PADDING = 14;
+const COUNTRY_LABEL_LEADER_EXPORT_PADDING = 2;
 
 const BASE_EXPORT_VIEWBOX: CountryLabelExportViewBox = {
   x: 30,
   y: 20,
   width: 2690,
   height: 1460,
+};
+
+const createCountryLabelExportViewBox = (
+  labels: CountryLabelLayout[],
+  scale: number,
+  extraHeight: number,
+): CountryLabelExportViewBox => {
+  const safeScale = Math.max(scale, 0.01);
+  const baseRight = BASE_EXPORT_VIEWBOX.x + BASE_EXPORT_VIEWBOX.width;
+  const baseBottom = BASE_EXPORT_VIEWBOX.y + BASE_EXPORT_VIEWBOX.height;
+  const labelPadding = COUNTRY_LABEL_EXPORT_PADDING / safeScale;
+  const leaderPadding = COUNTRY_LABEL_LEADER_EXPORT_PADDING / safeScale;
+  let contentLeft = BASE_EXPORT_VIEWBOX.x;
+  let contentRight = baseRight;
+  let contentTop = BASE_EXPORT_VIEWBOX.y;
+  let contentBottom = baseBottom;
+
+  labels.forEach((label) => {
+    contentLeft = Math.min(contentLeft, label.rect.left / safeScale - labelPadding);
+    contentRight = Math.max(contentRight, label.rect.right / safeScale + labelPadding);
+    contentTop = Math.min(contentTop, label.rect.top / safeScale - labelPadding);
+    contentBottom = Math.max(contentBottom, label.rect.bottom / safeScale + labelPadding);
+
+    getAbsoluteLeaderPoints(label, safeScale).forEach((point) => {
+      contentLeft = Math.min(contentLeft, point.x / safeScale - leaderPadding);
+      contentRight = Math.max(contentRight, point.x / safeScale + leaderPadding);
+      contentTop = Math.min(contentTop, point.y / safeScale - leaderPadding);
+      contentBottom = Math.max(contentBottom, point.y / safeScale + leaderPadding);
+    });
+  });
+
+  const horizontalExpansion = Math.ceil(Math.max(
+    0,
+    BASE_EXPORT_VIEWBOX.x - contentLeft,
+    contentRight - baseRight,
+  ));
+  const verticalExpansion = Math.ceil(Math.max(
+    0,
+    extraHeight / (safeScale * 2),
+    BASE_EXPORT_VIEWBOX.y - contentTop,
+    contentBottom - baseBottom,
+  ));
+
+  return {
+    x: BASE_EXPORT_VIEWBOX.x - horizontalExpansion,
+    y: BASE_EXPORT_VIEWBOX.y - verticalExpansion,
+    width: BASE_EXPORT_VIEWBOX.width + horizontalExpansion * 2,
+    height: BASE_EXPORT_VIEWBOX.height + verticalExpansion * 2,
+  };
 };
 
 const getCharacterWidth = (character: string) => {
@@ -1615,16 +1666,12 @@ export const createCountryLabelComposition = (
     outsideLayouts = hybridResult.layouts;
   }
 
-  const exportExtraHeight = Math.ceil((extraHeight / scale) / 2) * 2;
+  const labels = [...insideLayouts, ...outsideLayouts].sort((a, b) => a.name.localeCompare(b.name));
 
   return {
-    labels: [...insideLayouts, ...outsideLayouts].sort((a, b) => a.name.localeCompare(b.name)),
+    labels,
     artboardHeight: viewportHeight + extraHeight,
     verticalShift: extraHeight / 2,
-    exportViewBox: {
-      ...BASE_EXPORT_VIEWBOX,
-      y: BASE_EXPORT_VIEWBOX.y - exportExtraHeight / 2,
-      height: BASE_EXPORT_VIEWBOX.height + exportExtraHeight,
-    },
+    exportViewBox: createCountryLabelExportViewBox(labels, scale, extraHeight),
   };
 };
