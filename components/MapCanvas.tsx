@@ -15,6 +15,7 @@ import {
 import {
   COUNTRY_LABEL_FONT_SIZE,
   CountryLabelPlacementBounds,
+  MAP_DOT_RADIUS,
   createCountryLabelComposition,
   createRoundedOrthogonalPath,
 } from '../utils/countryLabels';
@@ -141,7 +142,7 @@ const MapGridDots = React.memo<MapGridDotsProps>(({
           key={`dot-${index}`}
           cx={dot.x}
           cy={dot.y}
-          r={6}
+          r={MAP_DOT_RADIUS}
           fill={isActive ? '#009681' : '#d5d4d4'}
           opacity={isActive ? 1 : 0.8}
           className="grid-dot"
@@ -215,6 +216,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     });
     return indices;
   }, [individuallySelectedCountries]);
+
+  const labelObstacleDotIndexes = useMemo(() => (
+    Array.from(individuallySelectedDotIndices).sort((a, b) => a - b)
+  ), [individuallySelectedDotIndices]);
 
   const allOfficeMarkers = useMemo(() => {
     const dotsWithIndices = MAP_DOTS.map((dot, index) => ({ ...dot, index }));
@@ -312,7 +317,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     placementScale: baseDefaultTransform.k,
     placementBounds: baseLabelPlacementBounds,
     viewportHeight: Math.max(viewportSize.height, 1),
-  }), [baseDefaultTransform.k, baseLabelPlacementBounds, viewportSize.height]);
+    obstacleDotIndexes: labelObstacleDotIndexes,
+  }), [
+    baseDefaultTransform.k,
+    baseLabelPlacementBounds,
+    viewportSize.height,
+    labelObstacleDotIndexes,
+  ]);
 
   const countryLabelCompositionCacheKey = useMemo(() => (
     createCountryLabelCompositionCacheKey(

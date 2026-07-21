@@ -8,6 +8,7 @@ export const COUNTRY_LABEL_CORNER_RADIUS = 6;
 export const COUNTRY_LABEL_MIN_PILL_APPROACH = 18;
 export const COUNTRY_LABEL_LEADER_CLEARANCE = 5;
 export const COUNTRY_LABEL_ROUTE_SEPARATION = 2;
+export const MAP_DOT_RADIUS = 6;
 
 export type CountryLabelPlacement = 'inside' | 'floating' | 'rail';
 export type CountryLabelSide = 'left' | 'right';
@@ -36,6 +37,7 @@ export interface CountryLabelExportViewBox {
 export interface CountryLabelLayout {
   name: string;
   anchor: MapPoint;
+  anchorDotIndex?: number;
   offset: MapPoint;
   width: number;
   height: number;
@@ -57,6 +59,7 @@ export interface CountryLabelCompositionOptions {
   placementScale: number;
   placementBounds?: CountryLabelPlacementBounds | null;
   viewportHeight: number;
+  obstacleDotIndexes?: readonly number[];
 }
 
 interface CountryFootprint {
@@ -83,6 +86,18 @@ interface RailResult {
   score: number;
 }
 
+interface DotObstacle {
+  index: number;
+  x: number;
+  y: number;
+}
+
+interface DotObstacleIndex {
+  buckets: Map<string, DotObstacle[]>;
+  cellSize: number;
+  radius: number;
+}
+
 const CONNECTED_DOT_DISTANCE = 34;
 const MIN_INSIDE_DOT_COUNT = 14;
 const INSIDE_PADDING = 30;
@@ -95,7 +110,14 @@ const MAX_FLOATING_PER_CLUSTER = 7;
 const DENSE_SELECTION_THRESHOLD = 28;
 const COMPACT_RAIL_SCALE_THRESHOLD = 0.15;
 const COMPACT_RAIL_LABEL_THRESHOLD = 8;
-const DOT_LEADER_GAP = 8;
+const DOT_LEADER_EDGE_GAP = 0.75;
+const DOT_OBSTACLE_CLEARANCE = 1.5;
+const DOT_OBSTACLE_CELL_SIZE = 24;
+const DOT_COLLISION_PENALTY = 10_000_000;
+const LEADER_PILL_COLLISION_PENALTY = 1_000_000_000;
+const PILL_COLLISION_PENALTY = 100_000_000_000;
+const ROUTE_OVERLAP_PENALTY = 1_000_000_000_000;
+const ROUTE_BACKTRACK_PENALTY = 10_000_000_000_000;
 const RAIL_GUTTER = 88;
 const ROUTING_LANE_GAP = 8;
 const ROUTING_VERTICAL_CLEARANCE = 4;
@@ -105,6 +127,22 @@ const STRAIGHT_ALIGNMENT_TOLERANCE = 0.5;
 const BENT_ROUTE_PENALTY = 64;
 const COUNTRY_LABEL_EXPORT_PADDING = 14;
 const COUNTRY_LABEL_LEADER_EXPORT_PADDING = 2;
+
+const getDotLeaderDeparture = (scale: number) => (
+  MAP_DOT_RADIUS * scale + DOT_LEADER_EDGE_GAP
+);
+
+const getLeaderStart = (
+  anchor: MapPoint,
+  side: CountryLabelSide,
+  scale: number,
+) => {
+  const direction = side === 'left' ? -1 : 1;
+  return {
+    x: anchor.x * scale + direction * getDotLeaderDeparture(scale),
+    y: anchor.y * scale,
+  };
+};
 
 const BASE_EXPORT_VIEWBOX: CountryLabelExportViewBox = {
   x: 30,
@@ -360,6 +398,86 @@ const routeIntersectsRect = (points: MapPoint[], rect: CountryLabelRect, padding
   ))
 );
 
+const createDotObstacleIndex = (
+  mapDots: MapPoint[],
+  scale: number,
+  obstacleDotIndexes: readonly number[],
+): DotObstacleIndex => {
+  const cellSize = DOT_OBSTACLE_CELL_SIZE;
+  const buckets = new Map<string, DotObstacle[]>();
+  Array.from(new Set(obstacleDotIndexes)).sort((a, b) => a - b).forEach((index) => {
+    const dot = mapDots[index];
+    if (!dot) return;
+    const obstacle = { index, x: dot.x * scale, y: dot.y * scale };
+    const key = `${Math.floor(obstacle.x / cellSize)}:${Math.floor(obstacle.y / cellSize)}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), obstacle]);
+  });
+
+  return {
+    buckets,
+    cellSize,
+    radius: MAP_DOT_RADIUS * scale + DOT_OBSTACLE_CLEARANCE,
+  };
+};
+
+const distanceFromPointToSegment = (
+  point: MapPoint,
+  start: MapPoint,
+  end: MapPoint,
+) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.000001) return distanceBetween(point, start);
+  const progress = Math.max(0, Math.min(
+    1,
+    ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
+  ));
+  return Math.hypot(point.x - (start.x + progress * dx), point.y - (start.y + progress * dy));
+};
+
+const segmentIntersectsDotObstacle = (
+  start: MapPoint,
+  end: MapPoint,
+  obstacleIndex: DotObstacleIndex,
+  ignoredDotIndex?: number,
+) => {
+  const { buckets, cellSize, radius } = obstacleIndex;
+  const minCellX = Math.floor((Math.min(start.x, end.x) - radius) / cellSize);
+  const maxCellX = Math.floor((Math.max(start.x, end.x) + radius) / cellSize);
+  const minCellY = Math.floor((Math.min(start.y, end.y) - radius) / cellSize);
+  const maxCellY = Math.floor((Math.max(start.y, end.y) + radius) / cellSize);
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+      const dots = buckets.get(`${cellX}:${cellY}`) ?? [];
+      for (const dot of dots) {
+        if (dot.index === ignoredDotIndex) continue;
+        if (distanceFromPointToSegment(dot, start, end) < radius - 0.001) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+};
+
+const getRouteDotCollisionCount = (
+  points: MapPoint[],
+  obstacleIndex: DotObstacleIndex,
+  ignoredDotIndex?: number,
+) => {
+  for (let index = 1; index < points.length; index += 1) {
+    if (segmentIntersectsDotObstacle(
+      points[index - 1],
+      points[index],
+      obstacleIndex,
+      ignoredDotIndex,
+    )) return 1;
+  }
+  return 0;
+};
+
 const routesOverlap = (first: MapPoint[], second: MapPoint[]) => {
   for (let firstIndex = 1; firstIndex < first.length; firstIndex += 1) {
     for (let secondIndex = 1; secondIndex < second.length; secondIndex += 1) {
@@ -405,10 +523,7 @@ const createLeaderPoints = (
   const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
   const side = forcedSide ?? (center.x < anchorScreen.x ? 'left' : 'right');
   const direction = side === 'left' ? -1 : 1;
-  const start = {
-    x: anchorScreen.x + direction * DOT_LEADER_GAP,
-    y: anchorScreen.y,
-  };
+  const start = getLeaderStart(anchor, side, scale);
   const end = {
     x: center.x - direction * width / 2,
     y: center.y,
@@ -460,10 +575,12 @@ const layoutConflicts = (
   layout: CountryLabelLayout,
   occupied: CountryLabelLayout[],
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   if (occupied.some((other) => countryLabelRectsOverlap(layout.rect, other.rect))) return true;
 
   const points = getAbsoluteLeaderPoints(layout, scale);
+  if (getRouteDotCollisionCount(points, dotObstacles, layout.anchorDotIndex) > 0) return true;
   if (occupied.some((other) => (
     routeIntersectsRect(points, other.rect, COUNTRY_LABEL_LEADER_CLEARANCE)
   ))) {
@@ -489,6 +606,7 @@ const createFloatingCandidates = (
   visibleBounds: CountryLabelPlacementBounds,
   mapCenterX: number,
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   const left = footprint.minX * scale;
   const right = footprint.maxX * scale;
@@ -590,6 +708,7 @@ const createFloatingCandidates = (
     const layout: CountryLabelLayout = {
       name: footprint.name,
       anchor,
+      anchorDotIndex: anchor.index,
       offset: {
         x: center.x - anchor.x * scale,
         y: center.y - anchor.y * scale,
@@ -601,7 +720,7 @@ const createFloatingCandidates = (
       side: leader.side,
       leaderPoints: leader.points,
     };
-    if (layoutConflicts(layout, occupied, scale)) return;
+    if (layoutConflicts(layout, occupied, scale, dotObstacles)) return;
 
     const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
     const absolutePoints = getAbsoluteLeaderPoints(layout, scale);
@@ -806,15 +925,14 @@ const assignRailLanes = (
   rows: number[],
   side: CountryLabelSide,
   scale: number,
-  portOffsets: Map<string, number>,
   alignedEdge: number,
   occupied: CountryLabelLayout[],
+  dotObstacles: DotObstacleIndex,
 ) => {
   const assignments = new Map<string, number>();
   const intervals = footprints
     .map((footprint, index) => {
-      const anchorY = getSideAnchor(footprint, side).y * scale +
-        (portOffsets.get(footprint.name) ?? 0);
+      const anchorY = getSideAnchor(footprint, side).y * scale;
       return {
         footprint,
         rowY: rows[index],
@@ -831,11 +949,7 @@ const assignRailLanes = (
 
   intervals.forEach((interval) => {
     const anchor = getSideAnchor(interval.footprint, side);
-    const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
-    const start = {
-      x: anchorScreen.x + direction * DOT_LEADER_GAP,
-      y: anchorScreen.y + (portOffsets.get(interval.name) ?? 0),
-    };
+    const start = getLeaderStart(anchor, side, scale);
     let bestLane = 0;
     let bestScore = Number.POSITIVE_INFINITY;
 
@@ -848,21 +962,25 @@ const assignRailLanes = (
 
       const laneDepth = COUNTRY_LABEL_MIN_PILL_APPROACH + laneIndex * ROUTING_LANE_GAP;
       const laneX = alignedEdge - direction * laneDepth;
-      const points = [
-        start,
-        { x: laneX, y: start.y },
-        { x: laneX, y: interval.rowY },
-        { x: alignedEdge, y: interval.rowY },
-      ];
+      const points = getRailRoute(
+        interval.footprint,
+        side,
+        interval.rowY,
+        alignedEdge,
+        laneIndex,
+        scale,
+      ).points;
       if (Math.abs(laneX - start.x) < MIN_DOT_DEPARTURE) continue;
       let score = laneIndex;
+      score += getRouteDotCollisionCount(points, dotObstacles, anchor.index) *
+        DOT_COLLISION_PENALTY;
       occupied.forEach((label) => {
         if (routeIntersectsRect(points, label.rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
-          score += 1_000_000;
+          score += LEADER_PILL_COLLISION_PENALTY;
         }
         const otherPoints = getAbsoluteLeaderPoints(label, scale);
         if (otherPoints.length > 1 && routesOverlap(points, otherPoints)) {
-          score += 1_000_000_000;
+          score += ROUTE_OVERLAP_PENALTY;
         }
       });
       if (score < bestScore) {
@@ -881,48 +999,6 @@ const assignRailLanes = (
   return assignments;
 };
 
-const assignRailPortOffsets = (
-  footprints: CountryFootprint[],
-  rows: number[],
-  side: CountryLabelSide,
-  scale: number,
-) => {
-  const items = footprints.map((footprint, index) => ({
-    footprint,
-    index,
-    anchorY: getSideAnchor(footprint, side).y * scale,
-  })).sort((a, b) => a.anchorY - b.anchorY || a.footprint.name.localeCompare(b.footprint.name));
-  const offsets = new Map<string, number>();
-  const reservedStarts: number[] = [];
-
-  items.forEach((item) => {
-    const ownRow = rows[item.index];
-    const candidates = [0];
-    for (let step = 1; step < footprints.length + 8; step += 1) {
-      candidates.push(-step * ROUTING_PORT_MIN_SEPARATION, step * ROUTING_PORT_MIN_SEPARATION);
-    }
-    if (Math.abs(item.anchorY - ownRow) < ROUTING_PORT_MIN_SEPARATION) {
-      candidates.unshift(ownRow - item.anchorY);
-    }
-
-    const offset = candidates.find((candidateOffset) => {
-      const candidateY = item.anchorY + candidateOffset;
-      const clearsStarts = reservedStarts.every((reservedY) => (
-        Math.abs(candidateY - reservedY) >= ROUTING_PORT_MIN_SEPARATION
-      ));
-      const clearsRows = rows.every((rowY, rowIndex) => (
-        rowIndex === item.index ||
-        Math.abs(candidateY - rowY) >= ROUTING_PORT_MIN_SEPARATION
-      ));
-      return clearsStarts && clearsRows;
-    }) ?? 0;
-    offsets.set(item.footprint.name, offset);
-    reservedStarts.push(item.anchorY + offset);
-  });
-
-  return offsets;
-};
-
 const getRailRoute = (
   footprint: CountryFootprint,
   side: CountryLabelSide,
@@ -930,15 +1006,11 @@ const getRailRoute = (
   alignedEdge: number,
   laneIndex: number,
   scale: number,
-  portOffset = 0,
 ) => {
   const anchor = getSideAnchor(footprint, side);
   const anchorScreen = { x: anchor.x * scale, y: anchor.y * scale };
   const direction = side === 'left' ? -1 : 1;
-  const start = {
-    x: anchorScreen.x + direction * DOT_LEADER_GAP,
-    y: anchorScreen.y + portOffset,
-  };
+  const start = getLeaderStart(anchor, side, scale);
   if (Math.abs(start.y - rowY) <= STRAIGHT_ALIGNMENT_TOLERANCE) {
     return {
       anchor,
@@ -967,12 +1039,23 @@ const getRailScore = (
   layouts: CountryLabelLayout[],
   occupied: CountryLabelLayout[],
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   let score = 0;
   const allLayouts = [...occupied, ...layouts];
 
   layouts.forEach((layout) => {
     const points = getAbsoluteLeaderPoints(layout, scale);
+    const direction = layout.side === 'left' ? -1 : 1;
+    const firstHorizontalPoint = points.slice(1).find((point) => (
+      Math.abs(point.x - points[0].x) > 0.001
+    ));
+    if (
+      firstHorizontalPoint &&
+      direction * (firstHorizontalPoint.x - points[0].x) < MIN_DOT_DEPARTURE
+    ) score += ROUTE_BACKTRACK_PENALTY;
+    score += getRouteDotCollisionCount(points, dotObstacles, layout.anchorDotIndex) *
+      DOT_COLLISION_PENALTY;
     if (points.length > 2) score += BENT_ROUTE_PENALTY;
     points.slice(1).forEach((point, index) => {
       score += distanceBetween(points[index], point);
@@ -985,7 +1068,7 @@ const getRailScore = (
             expandRect(other.rect, COUNTRY_LABEL_LEADER_CLEARANCE),
           )
         ) {
-          score += 1_000_000;
+          score += LEADER_PILL_COLLISION_PENALTY;
         }
       });
     });
@@ -993,11 +1076,13 @@ const getRailScore = (
 
   for (let first = 0; first < allLayouts.length; first += 1) {
     for (let second = first + 1; second < allLayouts.length; second += 1) {
-      if (countryLabelRectsOverlap(allLayouts[first].rect, allLayouts[second].rect)) score += 10_000_000;
+      if (countryLabelRectsOverlap(allLayouts[first].rect, allLayouts[second].rect)) {
+        score += PILL_COLLISION_PENALTY;
+      }
       const firstPoints = getAbsoluteLeaderPoints(allLayouts[first], scale);
       const secondPoints = getAbsoluteLeaderPoints(allLayouts[second], scale);
       if (firstPoints.length > 1 && secondPoints.length > 1 && routesOverlap(firstPoints, secondPoints)) {
-        score += 1_000_000_000;
+        score += ROUTE_OVERLAP_PENALTY;
       }
     }
   }
@@ -1013,6 +1098,7 @@ const createRailForSide = (
   occupied: CountryLabelLayout[],
   allFootprints: CountryFootprint[],
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ): RailResult => {
   if (footprints.length === 0) return { layouts: [], score: 0 };
 
@@ -1032,7 +1118,7 @@ const createRailForSide = (
       const otherPoints = getAbsoluteLeaderPoints(label, scale);
       if (otherPoints.length > 1) {
         if (routeIntersectsRect(otherPoints, rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
-          rectPenalty += 1_000_000;
+          rectPenalty += LEADER_PILL_COLLISION_PENALTY;
         }
       }
     });
@@ -1047,13 +1133,18 @@ const createRailForSide = (
         Math.abs(points[1].x - points[0].x) < MIN_DOT_DEPARTURE
       ) continue;
       let candidatePenalty = laneIndex;
+      candidatePenalty += getRouteDotCollisionCount(
+        points,
+        dotObstacles,
+        getSideAnchor(footprint, side).index,
+      ) * DOT_COLLISION_PENALTY;
       occupied.forEach((label) => {
         if (routeIntersectsRect(points, label.rect, COUNTRY_LABEL_LEADER_CLEARANCE)) {
-          candidatePenalty += 1_000_000;
+          candidatePenalty += LEADER_PILL_COLLISION_PENALTY;
         }
         const otherPoints = getAbsoluteLeaderPoints(label, scale);
         if (otherPoints.length > 1 && routesOverlap(points, otherPoints)) {
-          candidatePenalty += 1_000_000_000;
+          candidatePenalty += ROUTE_OVERLAP_PENALTY;
         }
       });
       routePenalty = Math.min(routePenalty, candidatePenalty);
@@ -1072,21 +1163,20 @@ const createRailForSide = (
     targetYFor,
   );
   let allocated = allocateAtCurrentEdge();
-  let portOffsets = assignRailPortOffsets(allocated.sorted, allocated.rows, side, scale);
   let laneAssignments = assignRailLanes(
     allocated.sorted,
     allocated.rows,
     side,
     scale,
-    portOffsets,
     alignedEdge,
     occupied,
+    dotObstacles,
   );
 
   for (let iteration = 0; iteration < 5; iteration += 1) {
     const requiredEdge = allocated.sorted.reduce((edge, footprint, index) => {
       const anchor = getSideAnchor(footprint, side);
-      const startX = anchor.x * scale + (side === 'left' ? -1 : 1) * DOT_LEADER_GAP;
+      const startX = getLeaderStart(anchor, side, scale).x;
       const isStraight = Math.abs(targetYFor(footprint) - allocated.rows[index]) <=
         STRAIGHT_ALIGNMENT_TOLERANCE;
       if (!isStraight) return edge;
@@ -1105,7 +1195,6 @@ const createRailForSide = (
         alignedEdge,
         laneIndex,
         scale,
-        portOffsets.get(footprint.name) ?? 0,
       );
       if (route.points.length < 4) return edge;
       const laneDepth = COUNTRY_LABEL_MIN_PILL_APPROACH + laneIndex * ROUTING_LANE_GAP;
@@ -1129,15 +1218,14 @@ const createRailForSide = (
     if (Math.abs(nextAlignedEdge - alignedEdge) <= 0.001) break;
     alignedEdge = nextAlignedEdge;
     allocated = allocateAtCurrentEdge();
-    portOffsets = assignRailPortOffsets(allocated.sorted, allocated.rows, side, scale);
     laneAssignments = assignRailLanes(
       allocated.sorted,
       allocated.rows,
       side,
       scale,
-      portOffsets,
       alignedEdge,
       occupied,
+      dotObstacles,
     );
   }
 
@@ -1150,13 +1238,13 @@ const createRailForSide = (
       alignedEdge,
       laneAssignments.get(footprint.name) ?? 0,
       scale,
-      portOffsets.get(footprint.name) ?? 0,
     );
     const { anchor, anchorScreen } = route;
 
     return {
       name: footprint.name,
       anchor,
+      anchorDotIndex: anchor.index,
       offset: {
         x: center.x - anchorScreen.x,
         y: center.y - anchorScreen.y,
@@ -1174,7 +1262,7 @@ const createRailForSide = (
     };
   });
 
-  return { layouts, score: getRailScore(layouts, occupied, scale) };
+  return { layouts, score: getRailScore(layouts, occupied, scale, dotObstacles) };
 };
 
 const getRequiredExtraHeight = (
@@ -1202,13 +1290,29 @@ const createDenseRails = (
   insideLayouts: CountryLabelLayout[],
   visibleBounds: CountryLabelPlacementBounds,
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   const sorted = [...footprints].sort((a, b) => (
     a.center.x - b.center.x || a.center.y - b.center.y || a.name.localeCompare(b.name)
   ));
   const splitIndex = Math.ceil(sorted.length / 2);
-  const left = sorted.slice(0, splitIndex);
-  const right = sorted.slice(splitIndex);
+  const sideByName = new Map(sorted.map((footprint, index) => [
+    footprint.name,
+    index < splitIndex ? 'left' as const : 'right' as const,
+  ]));
+  const sharedFootprints = new Map<string, CountryFootprint[]>();
+  sorted.forEach((footprint) => {
+    const key = footprint.dots.map((dot) => dot.index).sort((a, b) => a - b).join(',');
+    sharedFootprints.set(key, [...(sharedFootprints.get(key) ?? []), footprint]);
+  });
+  sharedFootprints.forEach((group) => {
+    if (group.length < 2) return;
+    [...group].sort((a, b) => a.name.localeCompare(b.name)).forEach((footprint, index) => {
+      sideByName.set(footprint.name, index % 2 === 0 ? 'left' : 'right');
+    });
+  });
+  const left = sorted.filter((footprint) => sideByName.get(footprint.name) === 'left');
+  const right = sorted.filter((footprint) => sideByName.get(footprint.name) === 'right');
   const extraHeight = Math.max(
     getRequiredExtraHeight(left.length, visibleBounds),
     getRequiredExtraHeight(right.length, visibleBounds),
@@ -1223,6 +1327,7 @@ const createDenseRails = (
     insideLayouts,
     footprints,
     scale,
+    dotObstacles,
   );
   const rightResult = createRailForSide(
     right,
@@ -1232,6 +1337,7 @@ const createDenseRails = (
     [...insideLayouts, ...leftResult.layouts],
     footprints,
     scale,
+    dotObstacles,
   );
 
   return {
@@ -1244,6 +1350,7 @@ const createCompactRail = (
   footprints: CountryFootprint[],
   visibleBounds: CountryLabelPlacementBounds,
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   const extraHeight = getRequiredExtraHeight(footprints.length, visibleBounds);
   const effectiveBounds = expandBoundsVertically(visibleBounds, extraHeight);
@@ -1256,6 +1363,7 @@ const createCompactRail = (
     [],
     footprints,
     scale,
+    dotObstacles,
   );
   const right = createRailForSide(
     footprints,
@@ -1265,6 +1373,7 @@ const createCompactRail = (
     [],
     footprints,
     scale,
+    dotObstacles,
   );
   const leftEdge = left.layouts[0]?.rect.right ?? Number.POSITIVE_INFINITY;
   const rightEdge = right.layouts[0]?.rect.left ?? Number.NEGATIVE_INFINITY;
@@ -1286,6 +1395,7 @@ const settleFloatingLayouts = (
   visibleBounds: CountryLabelPlacementBounds,
   mapCenterX: number,
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   let layouts = [...initialLayouts];
   const footprintByName = new Map(footprints.map((footprint) => [footprint.name, footprint]));
@@ -1330,6 +1440,7 @@ const settleFloatingLayouts = (
       visibleBounds,
       mapCenterX,
       scale,
+      dotObstacles,
     )[0];
     if (!replacement) break;
     layouts = [...withoutFloating, replacement.layout];
@@ -1345,6 +1456,7 @@ const createBestRailLayout = (
   occupied: CountryLabelLayout[],
   allFootprints: CountryFootprint[],
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ): RailResult => {
   if (footprints.length === 0) return { layouts: [], score: 0 };
 
@@ -1396,6 +1508,7 @@ const createBestRailLayout = (
         occupied,
         allFootprints,
         scale,
+        dotObstacles,
       );
       const right = createRailForSide(
         partition.right,
@@ -1405,11 +1518,12 @@ const createBestRailLayout = (
         [...occupied, ...left.layouts],
         allFootprints,
         scale,
+        dotObstacles,
       );
       const layouts = [...left.layouts, ...right.layouts];
       return {
         layouts,
-        score: getRailScore(layouts, occupied, scale),
+        score: getRailScore(layouts, occupied, scale, dotObstacles),
         key: `${partition.left.map((item) => item.name).join('|')}::${partition.right
           .map((item) => item.name).join('|')}`,
       };
@@ -1424,6 +1538,7 @@ const createHybridLayouts = (
   visibleBounds: CountryLabelPlacementBounds,
   mapCenterX: number,
   scale: number,
+  dotObstacles: DotObstacleIndex,
 ) => {
   const occupied = [...insideLayouts];
   const layouts: CountryLabelLayout[] = [];
@@ -1448,6 +1563,7 @@ const createHybridLayouts = (
           visibleBounds,
           mapCenterX,
           scale,
+          dotObstacles,
         )[0];
 
         if (!candidate) {
@@ -1474,6 +1590,7 @@ const createHybridLayouts = (
         [...occupied, ...floatingLayouts],
         allFootprints,
         scale,
+        dotObstacles,
       );
 
       maxRailCount = Math.max(
@@ -1494,9 +1611,219 @@ const createHybridLayouts = (
     visibleBounds,
     mapCenterX,
     scale,
+    dotObstacles,
   ).filter((layout) => !insideNames.has(layout.name));
 
   return { layouts: settledLayouts, maxRailCount };
+};
+
+const shiftLeaderDeparture = (
+  layout: CountryLabelLayout,
+  verticalOffset: number,
+  scale: number,
+) => {
+  const absolutePoints = getAbsoluteLeaderPoints(layout, scale).filter((point, index, points) => (
+    index === 0 || distanceBetween(point, points[index - 1]) > 0.001
+  ));
+  if (absolutePoints.length < 2) return layout;
+
+  const start = absolutePoints[0];
+  const end = absolutePoints[absolutePoints.length - 1];
+  const horizontalTargetIndex = absolutePoints.findIndex((point, index) => (
+    index > 0 && Math.abs(point.x - start.x) > 0.001
+  ));
+  if (horizontalTargetIndex < 0) return layout;
+
+  const shiftedY = start.y + verticalOffset;
+  const direction = layout.side === 'left' ? -1 : 1;
+  const horizontalTarget = absolutePoints[horizontalTargetIndex];
+  const shiftedPoints = horizontalTargetIndex === absolutePoints.length - 1
+    ? [
+      start,
+      { x: start.x, y: shiftedY },
+      { x: end.x - direction * COUNTRY_LABEL_MIN_PILL_APPROACH, y: shiftedY },
+      { x: end.x - direction * COUNTRY_LABEL_MIN_PILL_APPROACH, y: end.y },
+      end,
+    ]
+    : [
+      start,
+      { x: start.x, y: shiftedY },
+      { x: horizontalTarget.x, y: shiftedY },
+      ...absolutePoints.slice(horizontalTargetIndex + 1),
+    ];
+
+  return {
+    ...layout,
+    leaderPoints: shiftedPoints.map((point) => ({
+      x: point.x - layout.anchor.x * scale,
+      y: point.y - layout.anchor.y * scale,
+    })),
+  };
+};
+
+const shiftLeaderApproach = (
+  layout: CountryLabelLayout,
+  verticalOffset: number,
+  scale: number,
+) => {
+  const absolutePoints = getAbsoluteLeaderPoints(layout, scale).filter((point, index, points) => (
+    index === 0 || distanceBetween(point, points[index - 1]) > 0.001
+  ));
+  if (absolutePoints.length < 2) return layout;
+
+  const end = absolutePoints[absolutePoints.length - 1];
+  const direction = layout.side === 'left' ? -1 : 1;
+  const approachX = end.x - direction * COUNTRY_LABEL_MIN_PILL_APPROACH;
+  const laneSource = absolutePoints.length >= 3
+    ? absolutePoints[absolutePoints.length - 3]
+    : absolutePoints[0];
+  const laneX = absolutePoints.length >= 3
+    ? absolutePoints[absolutePoints.length - 2].x
+    : laneSource.x;
+  const shiftedY = end.y + verticalOffset;
+  const shiftedPoints = [
+    ...absolutePoints.slice(0, Math.max(1, absolutePoints.length - 2)),
+    { x: laneX, y: shiftedY },
+    { x: approachX, y: shiftedY },
+    { x: approachX, y: end.y },
+    end,
+  ];
+
+  return {
+    ...layout,
+    leaderPoints: shiftedPoints.map((point) => ({
+      x: point.x - layout.anchor.x * scale,
+      y: point.y - layout.anchor.y * scale,
+    })),
+  };
+};
+
+const resolveLeaderDotCollisions = (
+  layouts: CountryLabelLayout[],
+  scale: number,
+  dotObstacles: DotObstacleIndex,
+) => {
+  const result = [...layouts];
+  const orderedIndexes = result
+    .map((layout, index) => ({ index, name: layout.name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(({ index }) => index);
+
+  orderedIndexes.forEach((layoutIndex) => {
+    const layout = result[layoutIndex];
+    const originalPoints = getAbsoluteLeaderPoints(layout, scale);
+    if (
+      originalPoints.length < 2 ||
+      getRouteDotCollisionCount(originalPoints, dotObstacles, layout.anchorDotIndex) === 0
+    ) return;
+
+    const preferredOffset = originalPoints[originalPoints.length - 1].y - originalPoints[0].y;
+    const offsets = [preferredOffset];
+    for (let step = 1; step < result.length + 48; step += 1) {
+      offsets.push(
+        step * ROUTING_PORT_MIN_SEPARATION,
+        -step * ROUTING_PORT_MIN_SEPARATION,
+      );
+    }
+
+    for (const offset of offsets.filter((value, index, values) => (
+      Math.abs(value) > 0.001 &&
+      values.findIndex((candidate) => Math.abs(candidate - value) < 0.001) === index
+    ))) {
+      const candidate = shiftLeaderDeparture(layout, offset, scale);
+      const points = getAbsoluteLeaderPoints(candidate, scale);
+      if (getRouteDotCollisionCount(points, dotObstacles, candidate.anchorDotIndex) > 0) continue;
+      const conflicts = result.some((other, otherIndex) => {
+        if (otherIndex === layoutIndex) return false;
+        if (routeIntersectsRect(points, other.rect, COUNTRY_LABEL_LEADER_CLEARANCE)) return true;
+        const otherPoints = getAbsoluteLeaderPoints(other, scale);
+        return otherPoints.length > 1 && routesOverlap(points, otherPoints);
+      });
+      if (conflicts) continue;
+      result[layoutIndex] = candidate;
+      return;
+    }
+  });
+
+  return result;
+};
+
+const resolveLeaderOverlaps = (
+  layouts: CountryLabelLayout[],
+  scale: number,
+  dotObstacles: DotObstacleIndex,
+) => {
+  const result = [...layouts];
+  const findOverlap = () => {
+    for (let first = 0; first < result.length; first += 1) {
+      const firstPoints = getAbsoluteLeaderPoints(result[first], scale);
+      if (firstPoints.length < 2) continue;
+      for (let second = first + 1; second < result.length; second += 1) {
+        const secondPoints = getAbsoluteLeaderPoints(result[second], scale);
+        if (secondPoints.length > 1 && routesOverlap(firstPoints, secondPoints)) {
+          return [first, second] as const;
+        }
+      }
+    }
+    return null;
+  };
+
+  for (let iteration = 0; iteration < result.length * 4; iteration += 1) {
+    const overlap = findOverlap();
+    if (!overlap) break;
+    const candidatesToShift = [...overlap].sort((first, second) => (
+      result[second].name.localeCompare(result[first].name)
+    ));
+    let resolved = false;
+
+    for (const layoutIndex of candidatesToShift) {
+      const originalDotCollisionCount = getRouteDotCollisionCount(
+        getAbsoluteLeaderPoints(result[layoutIndex], scale),
+        dotObstacles,
+        result[layoutIndex].anchorDotIndex,
+      );
+      for (let step = 1; step < result.length + 12; step += 1) {
+        const signedOffsets = [
+          step * ROUTING_PORT_MIN_SEPARATION,
+          -step * ROUTING_PORT_MIN_SEPARATION,
+        ];
+        for (const offset of signedOffsets) {
+          const candidateRoutes = [
+            shiftLeaderDeparture(result[layoutIndex], offset, scale),
+            shiftLeaderApproach(result[layoutIndex], offset, scale),
+          ];
+          for (const candidate of candidateRoutes) {
+            const points = getAbsoluteLeaderPoints(candidate, scale);
+            if (
+              getRouteDotCollisionCount(points, dotObstacles, candidate.anchorDotIndex) >
+              originalDotCollisionCount
+            ) continue;
+            const conflicts = result.some((other, otherIndex) => {
+              if (otherIndex === layoutIndex) return false;
+              if (routeIntersectsRect(
+                points,
+                other.rect,
+                COUNTRY_LABEL_LEADER_CLEARANCE,
+              )) return true;
+              const otherPoints = getAbsoluteLeaderPoints(other, scale);
+              return otherPoints.length > 1 && routesOverlap(points, otherPoints);
+            });
+            if (conflicts) continue;
+            result[layoutIndex] = candidate;
+            resolved = true;
+            break;
+          }
+          if (resolved) break;
+        }
+        if (resolved) break;
+      }
+      if (resolved) break;
+    }
+
+    if (!resolved) break;
+  }
+
+  return result;
 };
 
 const getLineCommand = (from: MapPoint, to: MapPoint) => {
@@ -1574,6 +1901,11 @@ export const createCountryLabelComposition = (
     };
   }
 
+  const obstacleDotIndexes = options.obstacleDotIndexes ?? footprints.flatMap((footprint) => (
+    footprint.dots.map((dot) => dot.index)
+  ));
+  const dotObstacles = createDotObstacleIndex(mapDots, scale, obstacleDotIndexes);
+
   const insideLayouts: CountryLabelLayout[] = [];
   const outsideFootprints: CountryFootprint[] = [];
   const insideOrder = [...footprints].sort((a, b) => (
@@ -1603,6 +1935,7 @@ export const createCountryLabelComposition = (
     insideLayouts.push({
       name: footprint.name,
       anchor: footprint.interiorAnchor,
+      anchorDotIndex: footprint.interiorAnchor.index,
       offset: { x: 0, y: 0 },
       width: footprint.labelWidth,
       height: COUNTRY_LABEL_HEIGHT,
@@ -1618,7 +1951,7 @@ export const createCountryLabelComposition = (
     footprints.length >= COMPACT_RAIL_LABEL_THRESHOLD;
 
   if (useCompactRails) {
-    const compactResult = createCompactRail(footprints, visibleBounds, scale);
+    const compactResult = createCompactRail(footprints, visibleBounds, scale, dotObstacles);
     insideLayouts.length = 0;
     outsideLayouts = compactResult.layouts;
     extraHeight = compactResult.extraHeight;
@@ -1628,6 +1961,7 @@ export const createCountryLabelComposition = (
       [],
       visibleBounds,
       scale,
+      dotObstacles,
     );
     insideLayouts.length = 0;
     outsideLayouts = denseResult.layouts;
@@ -1648,6 +1982,7 @@ export const createCountryLabelComposition = (
       expandBoundsVertically(visibleBounds, extraHeight),
       mapCenterX,
       scale,
+      dotObstacles,
     );
     const requiredExtraHeight = getRequiredExtraHeight(hybridResult.maxRailCount, visibleBounds);
 
@@ -1660,13 +1995,20 @@ export const createCountryLabelComposition = (
         expandBoundsVertically(visibleBounds, extraHeight),
         mapCenterX,
         scale,
+        dotObstacles,
       );
     }
 
     outsideLayouts = hybridResult.layouts;
   }
 
-  const labels = [...insideLayouts, ...outsideLayouts].sort((a, b) => a.name.localeCompare(b.name));
+  const dotClearedLayouts = resolveLeaderDotCollisions(
+    [...insideLayouts, ...outsideLayouts],
+    scale,
+    dotObstacles,
+  );
+  const labels = resolveLeaderOverlaps(dotClearedLayouts, scale, dotObstacles)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return {
     labels,

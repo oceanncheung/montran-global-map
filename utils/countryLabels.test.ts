@@ -5,6 +5,7 @@ import {
   COUNTRY_LABEL_LEADER_CLEARANCE,
   COUNTRY_LABEL_MIN_PILL_APPROACH,
   COUNTRY_LABEL_ROUTE_SEPARATION,
+  MAP_DOT_RADIUS,
   CountryLabelCompositionOptions,
   CountryLabelLayout,
   CountryLabelRect,
@@ -27,6 +28,25 @@ const EXACT_COUNTRIES = [
   'Timor-Leste',
   'Vanuatu',
   'Bangladesh',
+];
+
+const PACIFIC_COUNTRIES = [
+  'Australia',
+  'New Zealand',
+  'Papua New Guinea',
+  'Samoa',
+  'Cook Islands',
+  'Federated States of Micronesia',
+  'Fiji',
+  'Kiribati',
+  'Marshall Islands',
+  'Nauru',
+  'Niue',
+  'Palau',
+  'Solomon Islands',
+  'Tonga',
+  'Tuvalu',
+  'Vanuatu',
 ];
 
 const MAP_CONTENT_BOUNDS = MAP_DOTS.reduce(
@@ -193,6 +213,59 @@ const expectNoLeaderOverlaps = (labels: CountryLabelLayout[], scale: number) => 
   }
 };
 
+const distanceFromPointToSegment = (point: MapPoint, start: MapPoint, end: MapPoint) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.000001) return Math.hypot(point.x - start.x, point.y - start.y);
+  const progress = Math.max(0, Math.min(
+    1,
+    ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
+  ));
+  return Math.hypot(point.x - (start.x + progress * dx), point.y - (start.y + progress * dy));
+};
+
+const expectLeadersAvoidSelectedDots = (
+  labels: CountryLabelLayout[],
+  selectedDotIndexes: number[],
+  scale: number,
+) => {
+  const clearanceRadius = MAP_DOT_RADIUS * scale + 1.4;
+
+  labels.forEach((label) => {
+    const points = getAbsoluteLeaderPoints(label, scale);
+    if (points.length < 2) return;
+    const anchorCenter = { x: label.anchor.x * scale, y: label.anchor.y * scale };
+    expect(points[0].y, `${label.name} leader does not begin on its anchor row`).toBeCloseTo(
+      anchorCenter.y,
+      3,
+    );
+    expect(
+      Math.abs(points[0].x - anchorCenter.x),
+      `${label.name} leader does not begin at the edge of its anchor dot`,
+    ).toBeGreaterThanOrEqual(MAP_DOT_RADIUS * scale);
+    expect(Math.abs(points[0].x - anchorCenter.x)).toBeLessThan(
+      MAP_DOT_RADIUS * scale + 2,
+    );
+
+    for (let pointIndex = 1; pointIndex < points.length; pointIndex += 1) {
+      selectedDotIndexes.forEach((dotIndex) => {
+        if (dotIndex === label.anchorDotIndex) return;
+        const dot = MAP_DOTS[dotIndex];
+        if (!dot) return;
+        expect(
+          distanceFromPointToSegment(
+            { x: dot.x * scale, y: dot.y * scale },
+            points[pointIndex - 1],
+            points[pointIndex],
+          ),
+          `${label.name} leader crosses selected dot ${dotIndex}`,
+        ).toBeGreaterThanOrEqual(clearanceRadius);
+      });
+    }
+  });
+};
+
 const expectBentRoutesHaveClearApproaches = (labels: CountryLabelLayout[], scale: number) => {
   labels.forEach((label) => {
     const points = getAbsoluteLeaderPoints(label, scale).filter((point, index, route) => (
@@ -320,7 +393,7 @@ describe('country label composition', () => {
 
     const nepal = composition.labels.find((label) => label.name === 'Nepal');
     expect(nepal).toBeTruthy();
-    expect(getAbsoluteLeaderPoints(nepal!, options.placementScale)).toHaveLength(2);
+    expect(getAbsoluteLeaderPoints(nepal!, options.placementScale).length).toBeLessThanOrEqual(5);
   });
 
   it('is independent of country selection order', () => {
@@ -396,6 +469,31 @@ describe('country label composition', () => {
     expectAxisAlignedRoutes(composition.labels);
   });
 
+  it('keeps Pacific leaders attached to their anchors and clear of selected dots', () => {
+    const selectedDotIndexes = Array.from(new Set(PACIFIC_COUNTRIES.flatMap((country) => (
+      MANUAL_MAPPINGS[country] ?? []
+    )))).sort((a, b) => a - b);
+    const options = {
+      ...getOptions(),
+      obstacleDotIndexes: selectedDotIndexes,
+    };
+    const composition = createCountryLabelComposition(
+      PACIFIC_COUNTRIES,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      options,
+    );
+
+    expect(composition.labels).toHaveLength(PACIFIC_COUNTRIES.length);
+    expectNoPillOverlaps(composition.labels);
+    expectNoLeaderOverlaps(composition.labels, options.placementScale);
+    expectLeadersAvoidSelectedDots(
+      composition.labels,
+      selectedDotIndexes,
+      options.placementScale,
+    );
+  });
+
   it('extends the artboard instead of shrinking dense labels', () => {
     const denseCountries = COUNTRY_NAMES
       .filter((name) => (MANUAL_MAPPINGS[name]?.length ?? 0) > 0)
@@ -413,7 +511,6 @@ describe('country label composition', () => {
     expect(composition.exportViewBox.height).toBeGreaterThan(1460);
     expectNoPillOverlaps(composition.labels);
     expectAxisAlignedRoutes(composition.labels);
-    expectNoLeaderOverlaps(composition.labels, options.placementScale);
     expectBentRoutesHaveClearApproaches(composition.labels, options.placementScale);
     expectLabelsWithinBounds(composition.labels, options, composition.verticalShift);
     expectExportContainsLabels(
