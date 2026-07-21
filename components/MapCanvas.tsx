@@ -18,6 +18,7 @@ import {
   createCountryLabelComposition,
   createRoundedOrthogonalPath,
 } from '../utils/countryLabels';
+import type { CountryLabelComposition } from '../utils/countryLabels';
 
 interface MapCanvasProps {
   selectedOffices: OfficeLocation[];
@@ -55,6 +56,7 @@ const LABEL_VIEWPORT_PADDING = 16;
 const LABEL_VIEWPORT_TOP = 112;
 const LABEL_VIEWPORT_BOTTOM = 88;
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const COUNTRY_LABEL_COMPOSITION_CACHE_LIMIT = 8;
 
 let countryLabelFontPromise: Promise<Font> | null = null;
 
@@ -105,6 +107,55 @@ const DEFAULT_VIEW_FRAME = {
   },
 } as const;
 
+const createCountryLabelCompositionCacheKey = (
+  countryNames: string[],
+  placementScale: number,
+  placementBounds: CountryLabelPlacementBounds | null,
+  viewportHeight: number,
+) => JSON.stringify([
+  Array.from(new Set(countryNames)).sort((a, b) => a.localeCompare(b)),
+  placementScale,
+  placementBounds,
+  viewportHeight,
+]);
+
+interface MapGridDotsProps {
+  activeDotIndices: Set<number>;
+  individuallySelectedDotIndices: Set<number>;
+  isGlobalGreen: boolean;
+}
+
+const MapGridDots = React.memo<MapGridDotsProps>(({
+  activeDotIndices,
+  individuallySelectedDotIndices,
+  isGlobalGreen,
+}) => (
+  <g id="grid-dots">
+    {MAP_DOTS.map((dot, index) => {
+      const isActive = isGlobalGreen || activeDotIndices.has(index);
+      if (!shouldRenderMapDot(index, individuallySelectedDotIndices.has(index))) return null;
+
+      const isRepresentative = index >= BASE_MAP_DOT_COUNT;
+      return (
+        <circle
+          key={`dot-${index}`}
+          cx={dot.x}
+          cy={dot.y}
+          r={6}
+          fill={isActive ? '#009681' : '#d5d4d4'}
+          opacity={isActive ? 1 : 0.8}
+          className="grid-dot"
+          data-dot-index={index}
+          data-representative={isRepresentative ? 'true' : 'false'}
+          style={{ transition: 'fill 150ms ease, opacity 150ms ease' }}
+        />
+      );
+    })}
+  </g>
+));
+
+MapGridDots.displayName = 'MapGridDots';
+
 const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedOffices,
   selectedCountries,
@@ -123,6 +174,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const defaultTransformRef = useRef<d3.ZoomTransform | null>(null);
   const hasInitializedDefaultRef = useRef(false);
   const isOverflowingRef = useRef(false);
+  const countryLabelCompositionCacheRef = useRef(new Map<string, CountryLabelComposition>());
+  const previousShowCountryLabelsRef = useRef(showCountryLabels);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -131,6 +184,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     () => new Set(highlightedCountries),
     [highlightedCountries],
   );
+  const didToggleCountryLabels = previousShowCountryLabelsRef.current !== showCountryLabels;
 
   useEffect(() => {
     let isMounted = true;
@@ -254,21 +308,59 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     );
   }, [viewportSize.width, viewportSize.height, baseDefaultTransform, isSidebarOpen]);
 
-  const countryLabelComposition = useMemo(() => createCountryLabelComposition(
-    showCountryLabels ? individuallySelectedCountries : [],
+  const countryLabelCompositionOptions = useMemo(() => ({
+    placementScale: baseDefaultTransform.k,
+    placementBounds: baseLabelPlacementBounds,
+    viewportHeight: Math.max(viewportSize.height, 1),
+  }), [baseDefaultTransform.k, baseLabelPlacementBounds, viewportSize.height]);
+
+  const countryLabelCompositionCacheKey = useMemo(() => (
+    createCountryLabelCompositionCacheKey(
+      individuallySelectedCountries,
+      countryLabelCompositionOptions.placementScale,
+      countryLabelCompositionOptions.placementBounds,
+      countryLabelCompositionOptions.viewportHeight,
+    )
+  ), [individuallySelectedCountries, countryLabelCompositionOptions]);
+
+  const hiddenCountryLabelComposition = useMemo(() => createCountryLabelComposition(
+    [],
     MANUAL_MAPPINGS,
     MAP_DOTS,
-    {
-      placementScale: baseDefaultTransform.k,
-      placementBounds: baseLabelPlacementBounds,
-      viewportHeight: Math.max(viewportSize.height, 1),
-    },
-  ), [
+    countryLabelCompositionOptions,
+  ), [countryLabelCompositionOptions]);
+
+  const countryLabelComposition = useMemo(() => {
+    if (!showCountryLabels) return hiddenCountryLabelComposition;
+
+    const cache = countryLabelCompositionCacheRef.current;
+    const cachedComposition = cache.get(countryLabelCompositionCacheKey);
+    if (cachedComposition) {
+      cache.delete(countryLabelCompositionCacheKey);
+      cache.set(countryLabelCompositionCacheKey, cachedComposition);
+      return cachedComposition;
+    }
+
+    const composition = createCountryLabelComposition(
+      individuallySelectedCountries,
+      MANUAL_MAPPINGS,
+      MAP_DOTS,
+      countryLabelCompositionOptions,
+    );
+    cache.set(countryLabelCompositionCacheKey, composition);
+
+    if (cache.size > COUNTRY_LABEL_COMPOSITION_CACHE_LIMIT) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey) cache.delete(oldestKey);
+    }
+
+    return composition;
+  }, [
     showCountryLabels,
+    hiddenCountryLabelComposition,
+    countryLabelCompositionCacheKey,
     individuallySelectedCountries,
-    baseDefaultTransform.k,
-    baseLabelPlacementBounds,
-    viewportSize.height,
+    countryLabelCompositionOptions,
   ]);
 
   const artboardHeight = Math.max(viewportSize.height, countryLabelComposition.artboardHeight);
@@ -360,7 +452,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     const isAtDefault =
       !currentTransformRef.current ||
       transformsMatch(currentTransformRef.current, defaultTransformRef.current);
-    const shouldAnimate = hasInitializedDefaultRef.current && isAtDefault;
+    const shouldAnimate = hasInitializedDefaultRef.current && isAtDefault && !didToggleCountryLabels;
 
     defaultTransformRef.current = defaultTransform;
     if (!hasInitializedDefaultRef.current || isAtDefault) {
@@ -374,6 +466,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     viewportSize.width,
     viewportSize.height,
   ]);
+
+  useEffect(() => {
+    previousShowCountryLabelsRef.current = showCountryLabels;
+  }, [showCountryLabels]);
 
   useEffect(() => {
     if (!scrollAreaRef.current) return;
@@ -626,28 +722,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               );
             })}
           </g>
-          <g id="grid-dots">
-            {MAP_DOTS.map((dot, i) => {
-              const isActive = isGlobalGreen || activeDotIndices.has(i);
-              if (!shouldRenderMapDot(i, individuallySelectedDotIndices.has(i))) return null;
-
-              const isRepresentative = i >= BASE_MAP_DOT_COUNT;
-              return (
-                <circle
-                  key={`dot-${i}`}
-                  cx={dot.x}
-                  cy={dot.y}
-                  r={6}
-                  fill={isActive ? "#009681" : "#d5d4d4"}
-                  opacity={isActive ? 1 : 0.8}
-                  className="grid-dot"
-                  data-dot-index={i}
-                  data-representative={isRepresentative ? 'true' : 'false'}
-                  style={{ transition: 'fill 150ms ease, opacity 150ms ease' }}
-                />
-              );
-            })}
-          </g>
+          <MapGridDots
+            activeDotIndices={activeDotIndices}
+            individuallySelectedDotIndices={individuallySelectedDotIndices}
+            isGlobalGreen={isGlobalGreen}
+          />
           <g id="country-labels" pointerEvents="none" aria-hidden="true">
             {countryLabelLayouts.map((label, index) => {
               const baseLabelScale = 1 / defaultScale;
