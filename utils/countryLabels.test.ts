@@ -470,6 +470,17 @@ describe('country label composition', () => {
     const nepal = composition.labels.find((label) => label.name === 'Nepal');
     expect(nepal).toBeTruthy();
     expect(getAbsoluteLeaderPoints(nepal!, options.placementScale).length).toBeLessThanOrEqual(5);
+
+    const fiji = composition.labels.find((label) => label.name === 'Fiji');
+    const vanuatu = composition.labels.find((label) => label.name === 'Vanuatu');
+    expect(fiji).toBeTruthy();
+    expect(vanuatu).toBeTruthy();
+    expect(vanuatu!.anchor.x).toBeLessThan(fiji!.anchor.x);
+    expect(vanuatu!.anchor.y).toBeLessThan(fiji!.anchor.y);
+    expect((vanuatu!.rect.left + vanuatu!.rect.right) / 2)
+      .toBeLessThan((fiji!.rect.left + fiji!.rect.right) / 2);
+    expect((vanuatu!.rect.top + vanuatu!.rect.bottom) / 2)
+      .toBeLessThan((fiji!.rect.top + fiji!.rect.bottom) / 2);
   });
 
   it('is independent of country selection order', () => {

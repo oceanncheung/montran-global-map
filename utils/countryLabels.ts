@@ -111,6 +111,9 @@ const FLOATING_GAP = 20;
 const BENT_FLOATING_GAP = 40;
 const FLOATING_CLUSTER_WIDTH = 180;
 const FLOATING_CLUSTER_HEIGHT = 136;
+const FLOATING_ORDER_NEIGHBOR_DISTANCE = 120;
+const FLOATING_ORDER_AXIS_TOLERANCE = 6;
+const FLOATING_ORDER_VIOLATION_PENALTY = 400;
 const MAX_FLOATING_PER_CLUSTER = 7;
 const DENSE_SELECTION_THRESHOLD = 28;
 const COMPACT_RAIL_SCALE_THRESHOLD = 0.15;
@@ -614,6 +617,42 @@ const layoutConflicts = (
   });
 };
 
+const getFloatingOrderPenalty = (
+  footprint: CountryFootprint,
+  center: MapPoint,
+  allFootprints: CountryFootprint[],
+  scale: number,
+) => {
+  const footprintCenter = {
+    x: footprint.center.x * scale,
+    y: footprint.center.y * scale,
+  };
+
+  return allFootprints.reduce((penalty, other) => {
+    if (other === footprint) return penalty;
+
+    const otherCenter = {
+      x: other.center.x * scale,
+      y: other.center.y * scale,
+    };
+    if (distanceBetween(footprintCenter, otherCenter) > FLOATING_ORDER_NEIGHBOR_DISTANCE) {
+      return penalty;
+    }
+
+    const getAxisPenalty = (anchorDelta: number, labelDelta: number) => {
+      if (Math.abs(anchorDelta) < FLOATING_ORDER_AXIS_TOLERANCE) return 0;
+      if (anchorDelta * labelDelta > 0) return 0;
+
+      const crossingDistance = Math.max(0, -Math.sign(anchorDelta) * labelDelta);
+      return FLOATING_ORDER_VIOLATION_PENALTY + crossingDistance * 2;
+    };
+
+    return penalty +
+      getAxisPenalty(footprintCenter.x - otherCenter.x, center.x - otherCenter.x) +
+      getAxisPenalty(footprintCenter.y - otherCenter.y, center.y - otherCenter.y);
+  }, 0);
+};
+
 const createFloatingCandidates = (
   footprint: CountryFootprint,
   allFootprints: CountryFootprint[],
@@ -745,10 +784,16 @@ const createFloatingCandidates = (
     );
     const movesOutward = Math.abs(center.x - mapCenterX) >= Math.abs(centerX - mapCenterX);
     const verticalDistance = Math.abs(center.y - anchorScreen.y);
+    const orderPenalty = getFloatingOrderPenalty(
+      footprint,
+      center,
+      allFootprints,
+      scale,
+    );
 
     candidates.push({
       layout,
-      score: routeLength + verticalDistance * 0.18 + position.penalty +
+      score: routeLength + verticalDistance * 0.18 + position.penalty + orderPenalty +
         (leader.points.length > 2 ? BENT_ROUTE_PENALTY : 0) +
         (movesOutward ? 0 : 14) + positionIndex * 0.001,
     });
