@@ -131,6 +131,20 @@ describe('country dot mappings', () => {
     expect(southKoreaEast).toBeLessThan(japanWest);
   });
 
+  it('separates Iceland from Greenland and keeps Canada off Greenland', () => {
+    const canadaDots = new Set(MANUAL_MAPPINGS.Canada);
+    const greenlandDots = new Set(MANUAL_MAPPINGS.Greenland);
+
+    MANUAL_MAPPINGS.Iceland.forEach((dotIndex) => {
+      expect(greenlandDots.has(dotIndex), `Greenland includes Iceland dot ${dotIndex}`).toBe(false);
+      expect(canadaDots.has(dotIndex), `Canada includes Iceland dot ${dotIndex}`).toBe(false);
+    });
+
+    expect(MANUAL_MAPPINGS.Canada).not.toContain(793);
+    expect(MANUAL_MAPPINGS.Greenland).toContain(793);
+    expect(MANUAL_MAPPINGS.Canada.filter((dotIndex) => greenlandDots.has(dotIndex))).toEqual([]);
+  });
+
   it('gives every visible artwork dot exactly one visual continent owner', () => {
     const ownersByDot = Array.from({ length: BASE_MAP_DOT_COUNT }, () => [] as string[]);
 

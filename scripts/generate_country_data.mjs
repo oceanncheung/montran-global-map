@@ -58,16 +58,6 @@ const VISUAL_REGION_RULES = [
     },
   },
   {
-    name: 'North Atlantic Seam',
-    countries: {
-      // One seam dot sits visually against Greenland on this artwork and reads
-      // like part of the Arctic arc rather than a separate island cluster.
-      Greenland: {
-        add: [642],
-      },
-    },
-  },
-  {
     name: 'Canadian Arctic Archipelago',
     countries: {
       // On this stylized map, the western seam of Greenland actually reads like
@@ -1015,12 +1005,25 @@ const applyCanadaGreenlandArcticSeam = ({
   mapping,
   dotCoords,
 }) => {
+  // Iceland is a separate island cluster southeast of Greenland. Its dots sit
+  // inside this broad Arctic bounding box but must never enter the seam split.
+  const icelandDots = new Set(mapping.Iceland ?? []);
   const candidateDots = dotCoords
-    .filter((dot) => dot.x >= 900 && dot.x <= 1205 && dot.y <= 360)
+    .filter((dot) => (
+      dot.x >= 900
+      && dot.x <= 1205
+      && dot.y <= 360
+      && !icelandDots.has(dot.index)
+    ))
     .map((dot) => dot.index);
+  const candidateDotSet = new Set(candidateDots);
 
-  const canadaDots = new Set((mapping.Canada ?? []).filter((dotIndex) => !candidateDots.includes(dotIndex)));
-  const greenlandDots = new Set((mapping.Greenland ?? []).filter((dotIndex) => !candidateDots.includes(dotIndex)));
+  const canadaDots = new Set((mapping.Canada ?? []).filter((dotIndex) => (
+    !candidateDotSet.has(dotIndex) && !icelandDots.has(dotIndex)
+  )));
+  const greenlandDots = new Set((mapping.Greenland ?? []).filter((dotIndex) => (
+    !candidateDotSet.has(dotIndex) && !icelandDots.has(dotIndex)
+  )));
 
   for (const dotIndex of candidateDots) {
     const dot = dotCoords[dotIndex];
@@ -1042,7 +1045,7 @@ const applyCanadaGreenlandArcticSeam = ({
   const greenlandWestArcDots = [
     2, 31, 32, 44, 49, 60, 71, 77, 86, 91, 92,
     110, 111, 112, 130, 137, 164, 175, 224, 289, 320, 434, 518, 622,
-    759, 963,
+    759, 793, 963,
   ];
   // Pulls dots back onto Canada after the west-arc pass (e.g. top-of-archipelago seam
   // dot 2 should stay Canadian; was only in Greenland because it is listed in the arc).
