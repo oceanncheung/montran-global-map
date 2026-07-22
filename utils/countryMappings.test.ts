@@ -30,6 +30,35 @@ const getCountryPoint = (countryName: string) => {
   return dotIndex === undefined ? undefined : MAP_DOTS[dotIndex];
 };
 
+const getConnectedComponents = (dotIndexes: number[], adjacencyDistance = 25) => {
+  const remaining = new Set(dotIndexes);
+  const components: number[][] = [];
+
+  while (remaining.size > 0) {
+    const first = remaining.values().next().value as number;
+    const component: number[] = [];
+    const queue = [first];
+    remaining.delete(first);
+
+    while (queue.length > 0) {
+      const dotIndex = queue.shift()!;
+      component.push(dotIndex);
+
+      for (const candidateIndex of remaining) {
+        const dot = MAP_DOTS[dotIndex];
+        const candidate = MAP_DOTS[candidateIndex];
+        if (Math.hypot(dot.x - candidate.x, dot.y - candidate.y) > adjacencyDistance) continue;
+        remaining.delete(candidateIndex);
+        queue.push(candidateIndex);
+      }
+    }
+
+    components.push(component);
+  }
+
+  return components;
+};
+
 describe('country dot mappings', () => {
   it('maps every listed place except the intentionally cropped Antarctica', () => {
     const unmapped = COUNTRY_NAMES.filter((name) => (MANUAL_MAPPINGS[name]?.length ?? 0) === 0);
@@ -80,6 +109,26 @@ describe('country dot mappings', () => {
     const tonga = getCountryPoint('Tonga');
     expect(samoa!.y).toBeLessThan(fiji!.y);
     expect(fiji!.y).toBeLessThan(tonga!.y);
+  });
+
+  it('keeps India visually connected through its northeast corridor', () => {
+    expect(MANUAL_MAPPINGS.India).toContain(1771);
+    expect(MANUAL_MAPPINGS.Bhutan).toContain(1771);
+    expect(getConnectedComponents(MANUAL_MAPPINGS.India)).toHaveLength(1);
+  });
+
+  it('keeps South Korea on the mainland side of Japan', () => {
+    const southKoreaDots = MANUAL_MAPPINGS['South Korea'];
+    const northKoreaDots = MANUAL_MAPPINGS['North Korea'];
+    const japanDots = new Set(MANUAL_MAPPINGS.Japan);
+
+    expect(southKoreaDots).toEqual([1653, 1658]);
+    expect(southKoreaDots.some((dotIndex) => northKoreaDots.includes(dotIndex))).toBe(true);
+    expect(southKoreaDots.some((dotIndex) => japanDots.has(dotIndex))).toBe(false);
+
+    const southKoreaEast = Math.max(...southKoreaDots.map((dotIndex) => MAP_DOTS[dotIndex].x));
+    const japanWest = Math.min(...MANUAL_MAPPINGS.Japan.map((dotIndex) => MAP_DOTS[dotIndex].x));
+    expect(southKoreaEast).toBeLessThan(japanWest);
   });
 
   it('gives every visible artwork dot exactly one visual continent owner', () => {

@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as d3 from 'd3';
+import { Delaunay } from 'd3-delaunay';
+import * as d3 from 'd3-geo';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,11 @@ const REPRESENTATIVE_WRAP_TOLERANCE = 100;
 const REPRESENTATIVE_DOT_EXCLUSIONS = new Set([
   'Antarctica',
 ]);
+const REPRESENTATIVE_DOT_OVERRIDES = {
+  // Keep South Korea on the lower Korean peninsula, immediately west of Japan.
+  // The geographic nearest-dot pass otherwise borrows Japan's western island dot.
+  'South Korea': [1653, 1658],
+};
 const VISUAL_REGION_RULES = [
   {
     name: 'British Isles',
@@ -378,10 +384,10 @@ const VISUAL_REGION_RULES = [
       Nepal: {
         replace: [1730, 1764, 1765],
       },
-      // Northeast India needs one bridge dot so the eastern pair reads as
-      // connected to mainland India.
+      // Northeast India needs the coarse Bhutan/India corridor dot as a shared
+      // seam so its eastern pair remains visibly connected to mainland India.
       India: {
-        add: [1780],
+        add: [1771, 1780],
       },
     },
   },
@@ -797,7 +803,16 @@ const createRepresentativeDot = (target, dotCoords) => {
   return snappedTarget;
 };
 
-const pickRepresentativeDot = ({ feature, dotCoords, constants }) => {
+const pickRepresentativeDot = ({ countryName, feature, dotCoords, constants }) => {
+  const overrideDots = REPRESENTATIVE_DOT_OVERRIDES[countryName];
+  if (overrideDots?.length) {
+    return {
+      mode: 'visual-override',
+      dots: [...overrideDots],
+      distance: null,
+    };
+  }
+
   const representativePoints = getRepresentativePoints(feature, constants);
   const nearest = findNearestDotToPoints(dotCoords, representativePoints);
 
@@ -839,6 +854,7 @@ const assignRepresentativeDots = ({
 
     const representativePoints = getRepresentativePoints(feature, constants).slice(0, 2);
     let pick = pickRepresentativeDot({
+      countryName: name,
       feature,
       dotCoords,
       constants,
@@ -1125,7 +1141,7 @@ const generateCountryData = async () => {
     seedLabels[dot.index] = bestCountry;
   }
 
-  const delaunay = d3.Delaunay.from(dotCoords, (dot) => dot.x, (dot) => dot.y);
+  const delaunay = Delaunay.from(dotCoords, (dot) => dot.x, (dot) => dot.y);
   const neighbors = dotCoords.map((_, index) => (
     Array.from(delaunay.neighbors(index)).filter((neighborIndex) => {
       const dx = dotCoords[index].x - dotCoords[neighborIndex].x;

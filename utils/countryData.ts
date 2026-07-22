@@ -2498,6 +2498,7 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1684,
     1736,
     1763,
+    1771,
     1780,
     1781,
     1787,
@@ -3638,7 +3639,8 @@ export const MANUAL_MAPPINGS: CountryDotMap = {
     1836
   ],
   "South Korea": [
-    1612
+    1653,
+    1658
   ],
   "Montenegro": [
     1422
