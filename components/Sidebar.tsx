@@ -368,26 +368,30 @@ const Sidebar: React.FC<SidebarProps> = ({
                           key={name}
                           className="inline-flex min-h-10 max-w-full items-center rounded-full border border-transparent bg-[#009681] text-white shadow-sm transition-colors hover:bg-[#007f6e]"
                         >
-                          <button
-                            type="button"
-                            aria-label={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
-                            aria-pressed={isHighlighted}
-                            title={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
-                            onClick={() => toggleCountryHighlight(name)}
-                            className={`ml-1.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-                              isHighlighted ? 'bg-white/[0.18] text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
-                            }`}
-                          >
-                            <Star
-                              size={16}
-                              strokeWidth={1.8}
-                              fill={isHighlighted ? 'currentColor' : 'none'}
-                            />
-                          </button>
+                          {showCountryLabels && (
+                            <button
+                              type="button"
+                              aria-label={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
+                              aria-pressed={isHighlighted}
+                              title={`${isHighlighted ? 'Remove highlight from' : 'Highlight'} ${name}`}
+                              onClick={() => toggleCountryHighlight(name)}
+                              className={`ml-1.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+                                isHighlighted ? 'bg-white/[0.18] text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                              }`}
+                            >
+                              <Star
+                                size={16}
+                                strokeWidth={1.8}
+                                fill={isHighlighted ? 'currentColor' : 'none'}
+                              />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeCountry(name)}
-                            className="group flex min-h-10 min-w-0 items-center gap-2 py-2 pr-4 pl-1 text-[16px] active:scale-[0.98]"
+                            className={`group flex min-h-10 min-w-0 items-center gap-2 py-2 pr-4 text-[16px] active:scale-[0.98] ${
+                              showCountryLabels ? 'pl-1' : 'pl-4'
+                            }`}
                             aria-label={`Remove ${name}`}
                           >
                             <span className="min-w-0 break-words text-left leading-tight">{name}</span>
