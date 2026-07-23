@@ -46,7 +46,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [countrySearch, setCountrySearch] = useState('');
   const [activeCountryIndex, setActiveCountryIndex] = useState(0);
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Corporate HQ']);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const countrySearchInputRef = useRef<HTMLInputElement>(null);
 
   const groupedOffices = useMemo<Record<string, MontranOffice[]>>(() => {
@@ -73,33 +72,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       setExpandedRegions(Object.keys(groupedOffices));
     }
     toggleAllOffices();
-  };
-
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (!text) return;
-
-      // Simple CSV parsing: split by newlines, then commas/semicolons
-      const lines = text.split(/\r?\n/);
-      const items = lines.flatMap(line => line.split(/[;,]/)).map(item => item.trim().replace(/^["']|["']$/g, ''));
-      
-      const matchedCountries = new Set<string>();
-      items.forEach(item => {
-        const match = allCountryNames.find(c => c.toLowerCase() === item.toLowerCase());
-        if (match) matchedCountries.add(match);
-      });
-
-      matchedCountries.forEach(name => addCountry(name));
-      
-      // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsText(file);
   };
 
   const filteredCountries = useMemo(() => {
@@ -169,15 +141,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           : 'h-[72px] shadow-none'
       }`}
     >
-      {/* Hidden File Input */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleCsvUpload} 
-        accept=".csv,text/csv" 
-        className="hidden" 
-      />
-
       {/* Header Section - Completely stable layout */}
       <div className="flex items-center gap-4 px-6 h-[72px] flex-shrink-0">
         <button 
@@ -414,24 +377,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Footer Button - Shared position and design */}
-      <div className={`p-6 border-t border-slate-100 bg-white transition-all duration-300 ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
-        {activeTab === SidebarTab.OFFICES ? (
+      {activeTab === SidebarTab.OFFICES && (
+        <div className={`p-6 border-t border-slate-100 bg-white transition-all duration-300 ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
           <button 
             onClick={handleToggleAllOffices}
             className="w-full py-5 bg-[#009681] text-white rounded-xl text-display-9 shadow-none hover:bg-[#007a69] transition-all active:scale-[0.98]"
           >
             {selectedOffices.length === MONTRAN_OFFICES.length ? 'Deselect All Offices' : 'Select All Offices'}
           </button>
-        ) : (
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full py-5 bg-[#009681] text-white rounded-xl text-display-9 shadow-none hover:bg-[#007a69] transition-all active:scale-[0.98]"
-          >
-            Upload CSV
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

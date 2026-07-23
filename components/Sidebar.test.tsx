@@ -42,4 +42,11 @@ describe('country selection chips', () => {
     expect(markup).not.toContain('aria-label="Highlight Fiji"');
     expect(markup).toContain('aria-label="Remove Fiji"');
   });
+
+  it('does not render CSV upload controls', () => {
+    const markup = renderCountrySidebar(true);
+
+    expect(markup).not.toContain('Upload CSV');
+    expect(markup).not.toContain('type="file"');
+  });
 });
