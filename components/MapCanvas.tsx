@@ -198,6 +198,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     () => new Set(highlightedCountries),
     [highlightedCountries],
   );
+  const canToggleCountryLabels = individuallySelectedCountries.length > 0;
   const didToggleCountryLabels = previousShowCountryLabelsRef.current !== showCountryLabels;
 
   useEffect(() => {
@@ -660,6 +661,36 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       <div className="absolute bottom-6 right-6 z-40 flex items-center gap-3">
         <button
           type="button"
+          onClick={onToggleCountryLabels}
+          disabled={!canToggleCountryLabels}
+          aria-label={
+            canToggleCountryLabels
+              ? showCountryLabels
+                ? 'Hide country labels'
+                : 'Show country labels'
+              : 'Select a country to use labels'
+          }
+          aria-pressed={showCountryLabels}
+          className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-200 ${
+            !canToggleCountryLabels
+              ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'
+              : showCountryLabels
+                ? 'border-[#009681] bg-[#009681] text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+          }`}
+          title={
+            canToggleCountryLabels
+              ? showCountryLabels
+                ? 'Hide country labels'
+                : 'Show country labels'
+              : 'Select a country to use labels'
+          }
+        >
+          <Tag size={18} strokeWidth={2} />
+        </button>
+
+        <button
+          type="button"
           onClick={() => onToggleGlobalGreen(!isGlobalGreen)}
           aria-label="Toggle all dots green"
           aria-pressed={isGlobalGreen}
@@ -674,21 +705,6 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
             <circle cx="12" cy="12" r="10" />
             <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onToggleCountryLabels}
-          aria-label={showCountryLabels ? 'Hide country labels' : 'Show country labels'}
-          aria-pressed={showCountryLabels}
-          className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-200 ${
-            showCountryLabels
-              ? 'border-[#009681] bg-[#009681] text-white shadow-sm'
-              : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-          }`}
-          title={showCountryLabels ? 'Hide country labels' : 'Show country labels'}
-        >
-          <Tag size={18} strokeWidth={2} />
         </button>
 
         <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300">

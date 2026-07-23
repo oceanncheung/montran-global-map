@@ -3,11 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import MapCanvas from './MapCanvas';
 
-const renderMapCanvas = (showCountryLabels: boolean) => renderToStaticMarkup(
+const renderMapCanvas = (
+  showCountryLabels: boolean,
+  selectedCountries: string[] = ['Fiji'],
+) => renderToStaticMarkup(
   <MapCanvas
     selectedOffices={[]}
-    selectedCountries={[]}
-    individuallySelectedCountries={[]}
+    selectedCountries={selectedCountries}
+    individuallySelectedCountries={selectedCountries}
     selectedContinents={[]}
     highlightedCountries={[]}
     showCountryLabels={showCountryLabels}
@@ -19,6 +22,16 @@ const renderMapCanvas = (showCountryLabels: boolean) => renderToStaticMarkup(
 );
 
 describe('map country label control', () => {
+  it('keeps the tag button disabled and left of the globe until a country is selected', () => {
+    const markup = renderMapCanvas(true, []);
+    const labelControlIndex = markup.indexOf('aria-label="Select a country to use labels"');
+    const globeControlIndex = markup.indexOf('aria-label="Toggle all dots green"');
+
+    expect(labelControlIndex).toBeGreaterThan(-1);
+    expect(markup).toContain('disabled=""');
+    expect(labelControlIndex).toBeLessThan(globeControlIndex);
+  });
+
   it('renders an active tag button when labels are visible', () => {
     const markup = renderMapCanvas(true);
 
