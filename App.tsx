@@ -81,7 +81,6 @@ const App: React.FC = () => {
         highlightedCountries={highlightedCountries}
         selectedContinents={selectedContinents}
         showCountryLabels={showCountryLabels}
-        onToggleCountryLabels={() => setShowCountryLabels((visible) => !visible)}
         addCountry={addCountry}
         removeCountry={removeCountry}
         toggleCountryHighlight={toggleCountryHighlight}
@@ -101,6 +100,7 @@ const App: React.FC = () => {
           isSidebarOpen={isSidebarOpen}
           isGlobalGreen={isGlobalGreen}
           onToggleGlobalGreen={toggleGlobalGreen}
+          onToggleCountryLabels={() => setShowCountryLabels((visible) => !visible)}
         />
       </main>
     </div>

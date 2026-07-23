@@ -16,7 +16,6 @@ interface SidebarProps {
   highlightedCountries: string[];
   selectedContinents: ContinentName[];
   showCountryLabels: boolean;
-  onToggleCountryLabels: () => void;
   addCountry: (name: string) => void;
   removeCountry: (name: string) => void;
   toggleCountryHighlight: (name: string) => void;
@@ -37,7 +36,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   highlightedCountries,
   selectedContinents,
   showCountryLabels,
-  onToggleCountryLabels,
   addCountry,
   removeCountry,
   toggleCountryHighlight,
@@ -280,35 +278,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-left">
               <div className="space-y-8">
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b-2 border-slate-100 py-4">
+                  <div className="border-b-2 border-slate-100 py-4">
                     <p className="text-display-9 tracking-tight text-slate-600">
                       By Country
                     </p>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={showCountryLabels}
-                      aria-label="Show country labels"
-                      onClick={onToggleCountryLabels}
-                      className="group flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-[#009681]/10"
-                    >
-                      <span className={`text-[14px] font-normal transition-colors ${showCountryLabels ? 'text-slate-600' : 'text-slate-400'}`}>
-                        Labels
-                      </span>
-                      <span
-                        className={`relative block h-6 w-10 flex-shrink-0 rounded-full border transition-colors duration-200 ${
-                          showCountryLabels
-                            ? 'border-[#009681] bg-[#009681]'
-                            : 'border-slate-200 bg-slate-100 group-hover:border-slate-300'
-                        }`}
-                      >
-                        <span
-                          className={`absolute left-[3px] top-[3px] block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                            showCountryLabels ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </span>
-                    </button>
                   </div>
 
                   <div className="relative">

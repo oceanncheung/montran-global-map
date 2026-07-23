@@ -2,6 +2,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import type { Font } from 'opentype.js';
+import { Tag } from 'lucide-react';
 import { geoToPixel } from '../utils/geo';
 import { OfficeLocation } from '../types';
 import { MONTRAN_OFFICES } from '../constants';
@@ -33,6 +34,7 @@ interface MapCanvasProps {
   isSidebarOpen: boolean;
   isGlobalGreen: boolean;
   onToggleGlobalGreen: (on: boolean) => void;
+  onToggleCountryLabels: () => void;
 }
 
 const MAP_CONTENT_BOUNDS = BASE_MAP_DOTS.reduce(
@@ -176,6 +178,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   isSidebarOpen,
   isGlobalGreen,
   onToggleGlobalGreen,
+  onToggleCountryLabels,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
@@ -618,7 +621,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       {/* Header UI */}
       <div className="absolute top-6 right-6 z-40">
         <div className="relative">
-          <button 
+          <button
             onClick={() => setIsExportOpen(!isExportOpen)}
             className={`bg-white border border-slate-200 px-6 h-[72px] rounded-xl flex items-center gap-3 hover:bg-slate-50 transition-all ${isExportOpen ? 'shadow-[0_15px_40px_rgba(0,0,0,0.08)]' : 'shadow-none'}`}
           >
@@ -655,43 +658,62 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
       {/* Footer UI */}
       <div className="absolute bottom-6 right-6 z-40 flex items-center gap-3">
-      <button
-        onClick={() => onToggleGlobalGreen(!isGlobalGreen)}
-        className={`h-12 px-4 flex items-center gap-2 rounded-xl border transition-all duration-200 ${
-          isGlobalGreen
-            ? 'bg-[#009681] border-[#009681] text-white shadow-sm'
-            : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-        }`}
-        title="Toggle all dots green"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      </button>
-      <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300">
-        <button 
-          onClick={handleZoomOut}
-          className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-xl font-light border-r border-slate-100"
-          aria-label="Zoom Out"
+        <button
+          type="button"
+          onClick={() => onToggleGlobalGreen(!isGlobalGreen)}
+          aria-label="Toggle all dots green"
+          aria-pressed={isGlobalGreen}
+          className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-200 ${
+            isGlobalGreen
+              ? 'border-[#009681] bg-[#009681] text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+          }`}
+          title="Toggle all dots green"
         >
-          &minus;
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg>
         </button>
-        <button 
-          onClick={handleResetZoom}
-          className="px-5 h-12 flex items-center justify-center text-[14px] font-medium text-slate-500 tabular-nums select-none min-w-[64px] hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
-          title="Reset to 1x"
+
+        <button
+          type="button"
+          onClick={onToggleCountryLabels}
+          aria-label={showCountryLabels ? 'Hide country labels' : 'Show country labels'}
+          aria-pressed={showCountryLabels}
+          className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-200 ${
+            showCountryLabels
+              ? 'border-[#009681] bg-[#009681] text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+          }`}
+          title={showCountryLabels ? 'Hide country labels' : 'Show country labels'}
         >
-          {(zoomScale / defaultScale).toFixed(1)}x
+          <Tag size={18} strokeWidth={2} />
         </button>
-        <button 
-          onClick={handleZoomIn}
-          className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-xl font-light border-l border-slate-100"
-          aria-label="Zoom In"
-        >
-          +
-        </button>
-      </div>
+
+        <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden transition-all duration-300">
+          <button
+            onClick={handleZoomOut}
+            className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-xl font-light border-r border-slate-100"
+            aria-label="Zoom Out"
+          >
+            &minus;
+          </button>
+          <button
+            onClick={handleResetZoom}
+            className="px-5 h-12 flex items-center justify-center text-[14px] font-medium text-slate-500 tabular-nums select-none min-w-[64px] hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Reset to 1x"
+          >
+            {(zoomScale / defaultScale).toFixed(1)}x
+          </button>
+          <button
+            onClick={handleZoomIn}
+            className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-xl font-light border-l border-slate-100"
+            aria-label="Zoom In"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div

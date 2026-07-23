@@ -18,7 +18,6 @@ const renderCountrySidebar = (showCountryLabels: boolean) => renderToStaticMarku
     highlightedCountries={[]}
     selectedContinents={[]}
     showCountryLabels={showCountryLabels}
-    onToggleCountryLabels={() => undefined}
     addCountry={() => undefined}
     removeCountry={() => undefined}
     toggleCountryHighlight={() => undefined}
@@ -34,6 +33,7 @@ describe('country selection chips', () => {
 
     expect(markup).toContain('aria-label="Highlight Fiji"');
     expect(markup).toContain('aria-label="Remove Fiji"');
+    expect(markup).not.toContain('aria-label="Show country labels"');
   });
 
   it('hides the highlight control while country labels are hidden', () => {
