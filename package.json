@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:sites": "node scripts/build_sites.mjs",
     "test": "vitest run",
     "start": "node server.js",
     "preview": "vite preview",
